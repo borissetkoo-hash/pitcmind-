@@ -11,13 +11,13 @@ export function computeRatings(match: Match): void {
       const s = p.stats;
       if (s.minutes <= 0 && p.enteredAt === 0 && p.leftAt === null) s.minutes = Math.round(match.clock / 60);
       let r = 6.0;
-      r += s.goals * 1.0 + s.assists * 0.6 + s.keyPasses * 0.15;
-      r += s.shotsOnTarget * 0.1 - (s.shots - s.shotsOnTarget) * 0.04;
-      r += s.passesCompleted * 0.012 - (s.passes - s.passesCompleted) * 0.035;
-      r += s.tacklesWon * 0.12 + s.interceptions * 0.1 + s.dribbles * 0.08 - s.fouls * 0.06;
-      r += s.saves * 0.3;
+      r += s.goals * 1.0 + s.assists * 0.6 + s.keyPasses * 0.12;
+      r += s.shotsOnTarget * 0.08 - (s.shots - s.shotsOnTarget) * 0.04;
+      r += Math.min(0.6, s.passesCompleted * 0.006) - (s.passes - s.passesCompleted) * 0.03;
+      r += Math.min(0.8, s.tacklesWon * 0.035 + s.interceptions * 0.05 + s.dribbles * 0.03) - s.fouls * 0.06;
+      r += s.saves * 0.18;
       if (p.isGK || p.role === 'CB' || p.role === 'LB' || p.role === 'RB' || p.role === 'LWB' || p.role === 'RWB') {
-        r += conceded === 0 ? 0.5 : -conceded * 0.25;
+        r += conceded === 0 ? 0.4 : -conceded * 0.3;
       }
       if (team.goals > team.opponent.goals) r += 0.25;
       else if (team.goals < team.opponent.goals) r -= 0.2;

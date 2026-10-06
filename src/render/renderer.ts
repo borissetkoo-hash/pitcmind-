@@ -2,6 +2,7 @@ import { offsideLineLocal } from '../engine/ai/evaluate';
 import type { Match } from '../engine/match';
 import { GOAL_TOP, HALF_X, MID_Y, PITCH, toWorld } from '../engine/pitch';
 import type { Player } from '../engine/player';
+import { type Kit, resolveKits } from './kits';
 
 export interface RenderOptions {
   names: boolean;
@@ -26,6 +27,8 @@ export class PitchRenderer {
   private h = 0;
   private pitchCache: HTMLCanvasElement | null = null;
   private trail: { x: number; y: number; z: number }[] = [];
+  private kits: [Kit, Kit] | null = null;
+  private kitsFor: Match | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -202,7 +205,11 @@ export class PitchRenderer {
       }
     } else this.trail.length = 0;
 
-    const teams = match.teams;
+    if (!this.kits || this.kitsFor !== match) {
+      this.kits = resolveKits(match.teams[0].club, match.teams[1].club);
+      this.kitsFor = match;
+    }
+    const kits = this.kits;
     const r = 0.95 * s;
     // Shadows first so they sit under everyone.
     g.fillStyle = 'rgba(0,0,0,0.25)';
@@ -212,10 +219,10 @@ export class PitchRenderer {
       g.fill();
     }
     for (const p of frame.players) {
-      const club = teams[p.team].club;
-      const fill = p.gk ? club.keeperColors.primary : club.colors.primary;
-      const stroke = p.gk ? club.keeperColors.text : club.colors.secondary;
-      const text = p.gk ? club.keeperColors.text : club.colors.text;
+      const kit = kits[p.team];
+      const fill = p.gk ? kit.gkFill : kit.fill;
+      const stroke = p.gk ? kit.gkText : kit.stroke;
+      const text = p.gk ? kit.gkText : kit.text;
       const x = this.px(p.x);
       const y = this.py(p.y);
       if (p.owner) {
@@ -300,7 +307,7 @@ export class PitchRenderer {
       const lx = offsideLineLocal(team.dir, team.opponent.active, match.ball.pos);
       const wx = toWorld({ x: lx, y: 0 }, team.dir).x;
       g.setLineDash([6, 6]);
-      g.strokeStyle = team.club.colors.primary;
+      g.strokeStyle = team.index === 0 ? '#7db5ff' : '#ffab7a';
       g.globalAlpha = 0.8;
       g.lineWidth = 2;
       g.beginPath();

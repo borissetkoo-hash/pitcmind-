@@ -1,7 +1,7 @@
 import { FORMATIONS, type Slot, roleFit } from './formations';
 import { Player } from './player';
 import { PITCH, toWorld } from './pitch';
-import { type ClubData, type PlayerData, type Tactics, withDefaults } from './types';
+import { type ClubData, type CoachTraits, type PlayerData, type Tactics, withDefaults } from './types';
 import { overall } from './attributes';
 
 export interface TeamStats {
@@ -58,8 +58,19 @@ export class Team {
   goals = 0;
   stats: TeamStats = emptyTeamStats();
   opponent!: Team;
+  /** Coaching modifiers: 0.07 per attribute point away from 10, so 0 is neutral and 0.7 elite. */
+  readonly coaching: Record<keyof CoachTraits, number>;
+  /** Match clock when this team last won the ball back (drives counter-attacks). */
+  wonBallAt = -99;
 
-  constructor(index: 0 | 1, club: ClubData, tactics: Tactics, dir: 1 | -1) {
+  constructor(index: 0 | 1, club: ClubData, tactics: Tactics, dir: 1 | -1, coach?: CoachTraits) {
+    const c = coach ?? { passing: 10, organisation: 10, pressing: 10, counter: 10, setPieces: 10, aerial: 10, fitness: 10 };
+    // A great coach matters, but less than the players: an elite attribute (20) gives k = 0.7.
+    const k = (v: number) => ((v - 10) / 10) * 0.7;
+    this.coaching = {
+      passing: k(c.passing), organisation: k(c.organisation), pressing: k(c.pressing), counter: k(c.counter),
+      setPieces: k(c.setPieces), aerial: k(c.aerial), fitness: k(c.fitness),
+    };
     this.index = index;
     this.club = club;
     this.tactics = withDefaults(tactics);

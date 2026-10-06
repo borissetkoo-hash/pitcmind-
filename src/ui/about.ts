@@ -53,14 +53,14 @@ const EN = `
 <p>TypeScript, Canvas 2D, dependency-free SVG charts, Web Workers to simulate league rounds in parallel, Vite, Vitest. Zero runtime dependencies.</p>`;
 
 const ROWS: [string, string, string, string][] = [
-  ['goals', 'Голы', '3.02', '~2.7'],
-  ['shots', 'Удары', '25.7', '~25'],
+  ['goals', 'Голы', '3.15', '~2.7'],
+  ['shots', 'Удары', '26.8', '~25'],
   ['on target', 'В створ', '10.3', '~8.5'],
-  ['goals / xG', 'Голы / xG', '0.90', '1.0'],
-  ['fouls', 'Фолы', '24.4', '~22'],
-  ['yellow cards', 'Жёлтые', '4.1', '~4'],
-  ['offsides', 'Офсайды', '5.2', '~4'],
-  ['draws', 'Ничьи', '31 %', '~25 %'],
+  ['goals / xG', 'Голы / xG', '0.78', '1.0'],
+  ['fouls', 'Фолы', '27.5', '~22'],
+  ['yellow cards', 'Жёлтые', '3.8', '~4'],
+  ['offsides', 'Офсайды', '7.0', '~4'],
+  ['draws', 'Ничьи', '15 %', '~25 %'],
 ];
 
 export function renderAbout(root: HTMLElement): void {

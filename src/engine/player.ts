@@ -158,7 +158,7 @@ export class Player {
 
     // Fatigue: sprinting drains, walking recovers a little.
     const effort = sp / 7.5;
-    const drain = 0.0009 * effort * effort * effort * (1.55 - this.a.stamina / 100);
+    const drain = 0.0009 * effort * effort * effort * (1.55 - this.a.stamina / 100) * (1 - 0.3 * this.team.coaching.fitness);
     this.energy = clamp(this.energy - drain * dt + (sp < 2 ? 0.00004 * dt : 0), 0.2, 1);
 
     if (this.kickCooldown > 0) this.kickCooldown -= dt;

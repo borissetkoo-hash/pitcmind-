@@ -2,7 +2,10 @@ import './styles.css';
 import { clubById } from './data/clubs';
 import { type Lang, getLang, setLang, t } from './i18n';
 import type { Fixture } from './league/league';
+import { coachById } from './data/coaches';
 import { renderAbout } from './ui/about';
+import { installTooltips } from './ui/charts';
+import { renderCoaches } from './ui/coachUi';
 import { bootScreen } from './ui/boot';
 import { renderMenu } from './ui/menu';
 import { loadSeason, renderLeague, saveSeason } from './ui/leagueView';
@@ -28,6 +31,7 @@ function drawNav(route: string): void {
     ['#/menu', t('navMenu')],
     ['#/match', t('navMatch')],
     ['#/league', t('navLeague')],
+    ['#/coaches', t('coaches')],
     ['#/about', t('navAbout')],
   ];
   nav.innerHTML = items.map(([href, label]) => `<a href="${href}" class="${route.startsWith(href.slice(1)) ? 'active' : ''}">${label}</a>`).join('');
@@ -67,10 +71,16 @@ function route(): void {
       const away = clubById(f.away);
       history.pushState(null, '', '#/match/live');
       drawNav('/match');
-      startMatch({ home, away, homeTactics: { ...home.tactics }, awayTactics: { ...away.tactics }, seed: f.seed }, false, f);
+      startMatch({
+        home, away, homeTactics: { ...home.tactics }, awayTactics: { ...away.tactics }, seed: f.seed,
+        homeCoach: coachById(home.coachId), awayCoach: coachById(away.coachId),
+      }, false, f);
     });
   } else if (r.startsWith('/about')) {
     renderAbout(view);
+  } else if (r.startsWith('/coaches')) {
+    renderCoaches(view);
+    installTooltips(view);
   } else if (r.startsWith('/match')) {
     renderSetup(view, lastSetup, (s, instant) => {
       history.pushState(null, '', '#/match/live');

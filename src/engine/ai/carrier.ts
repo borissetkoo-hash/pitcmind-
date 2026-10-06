@@ -78,9 +78,10 @@ export function generateOptions(match: Match, p: Player, restart: KickContext): 
         const tw = toWorld(tl, dir);
         const g2 = groundPassSuccess(p, r, tw);
         const v2 = positionValue(tl.x, tl.y) * (0.75 + 0.25 * clamp(nearestOpponentDistance(r, tw) / 7, 0, 1));
+        const counterBonus = match.onCounter(team) ? 0.006 * team.coaching.counter : 0;
         addPass({
           kind: 'through', target: tw, receiver: r, success: g2.p, speed: g2.speed,
-          utility: g2.p * v2 - (1 - g2.p) * lossCost((me.x + tl.x) / 2, (me.y + tl.y) / 2),
+          utility: g2.p * v2 - (1 - g2.p) * lossCost((me.x + tl.x) / 2, (me.y + tl.y) / 2) + counterBonus,
         });
       }
     }
@@ -177,7 +178,8 @@ export function generateOptions(match: Match, p: Player, restart: KickContext): 
 /** Softmax pick: better players choose the best option more consistently. */
 export function chooseOption(match: Match, p: Player, opts: Option[]): Option | null {
   if (opts.length === 0) return null;
-  const temp = 0.0008 + (1 - (p.a.vision * 0.5 + p.a.composure * 0.5) / 100) * 0.003;
+  // Possession coaches drill better decisions: a lower softmax temperature.
+  const temp = (0.0008 + (1 - (p.a.vision * 0.5 + p.a.composure * 0.5) / 100) * 0.003) * clamp(1 - 0.3 * p.team.coaching.passing, 0.5, 1.4);
   const best = Math.max(...opts.map((o) => o.utility));
   const weights = opts.map((o) => Math.exp((o.utility - best) / temp));
   return opts[match.rng.weighted(weights)];
@@ -215,7 +217,7 @@ export function execute(match: Match, p: Player, o: Option, restart: KickContext
     case 'pass':
     case 'through': {
       const d = dist(p.pos, o.target);
-      const err = 0.02 + (1 - p.a.passing / 100) * 0.06 + pressure * 0.04;
+      const err = (0.02 + (1 - p.a.passing / 100) * 0.06 + pressure * 0.04) * (1 - 0.35 * p.team.coaching.passing);
       const dirV = norm(sub(o.target, p.pos));
       const ang = Math.atan2(dirV.y, dirV.x) + rng.normal(0, err);
       const speed = (o.speed ?? 12) * (1 + rng.normal(0, 0.05));
@@ -227,7 +229,9 @@ export function execute(match: Match, p: Player, o: Option, restart: KickContext
     case 'clear': {
       const kind = o.kind === 'cross' ? 'cross' : o.kind === 'clear' ? 'clear' : restart === 'throwIn' ? 'throw' : 'pass';
       const d0 = dist(p.pos, o.target);
-      const spread = d0 * (0.02 + (1 - p.a.passing / 100) * 0.07) + (o.kind === 'clear' ? 6 : 0);
+      const setPiece = restart === 'corner' || restart === 'freeKick';
+      const drill = setPiece ? 1 - 0.35 * p.team.coaching.setPieces : 1 - 0.25 * p.team.coaching.passing;
+      const spread = (d0 * (0.02 + (1 - p.a.passing / 100) * 0.07) + (o.kind === 'clear' ? 6 : 0)) * drill;
       const landing = clampToPitch(add(o.target, fromAngle(rng.range(0, Math.PI * 2), Math.abs(rng.normal(0, spread)))), -1);
       const d = dist(p.pos, landing);
       const flight = o.flightTime ?? clamp(0.7 + d / 24, 0.9, 2.8);

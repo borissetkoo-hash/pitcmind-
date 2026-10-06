@@ -51,6 +51,18 @@ export const FORMATIONS: Record<FormationId, Slot[]> = {
     { role: 'LM', x: 0.55, y: 0.12 }, { role: 'CM', x: 0.52, y: 0.38 }, { role: 'CM', x: 0.52, y: 0.62 }, { role: 'RM', x: 0.55, y: 0.88 },
     { role: 'ST', x: 0.84, y: 0.5 },
   ],
+  '3-4-3': [
+    GK,
+    { role: 'CB', x: 0.17, y: 0.27 }, { role: 'CB', x: 0.15, y: 0.5 }, { role: 'CB', x: 0.17, y: 0.73 },
+    { role: 'LWB', x: 0.45, y: 0.08 }, { role: 'CM', x: 0.42, y: 0.38 }, { role: 'CM', x: 0.42, y: 0.62 }, { role: 'RWB', x: 0.45, y: 0.92 },
+    { role: 'LW', x: 0.76, y: 0.18 }, { role: 'ST', x: 0.84, y: 0.5 }, { role: 'RW', x: 0.76, y: 0.82 },
+  ],
+  '3-4-2-1': [
+    GK,
+    { role: 'CB', x: 0.17, y: 0.27 }, { role: 'CB', x: 0.15, y: 0.5 }, { role: 'CB', x: 0.17, y: 0.73 },
+    { role: 'LWB', x: 0.45, y: 0.08 }, { role: 'CM', x: 0.4, y: 0.38 }, { role: 'CM', x: 0.4, y: 0.62 }, { role: 'RWB', x: 0.45, y: 0.92 },
+    { role: 'AM', x: 0.68, y: 0.34 }, { role: 'AM', x: 0.68, y: 0.66 }, { role: 'ST', x: 0.85, y: 0.5 },
+  ],
 };
 
 export const FORMATION_IDS = Object.keys(FORMATIONS) as FormationId[];

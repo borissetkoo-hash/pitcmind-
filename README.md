@@ -11,6 +11,7 @@ PitchMind is a 2D football (soccer) match engine and web app written in TypeScri
 - **Live match** on Canvas with smooth interpolation, 1×–32× speed, instant result, broadcast scoreboard, auto **goal replays**.
 - **AI vision overlay** (`V`): see the ball carrier's evaluated options coloured by utility with success probabilities, both offside lines and every player's movement target.
 - **Tactics that matter** — formation (6 shapes), mentality, pressing, defensive line, width, directness, tempo, shooting range, crossing and tackling — editable *during* the match. Each instruction has a measurable effect, e.g. shooting range 0 → 0 % of shots from outside the box, 1 → 47 %; crossing 0 → ~1 cross a match, 1 → ~23; tackling 0 → 7 fouls, 1 → 14.
+- **31 real-world coaches** with Football-Manager-style coaching attributes (1–20): passing, defensive organisation, pressing, counter-attacks, set pieces, aerial game, conditioning. Each attribute drives a specific engine mechanic, and picking a coach brings his preferred formation and instructions — Simeone's sides defend in a tight 4-4-2 and win more duels, Guardiola's pass more accurately and choose better on the ball. In a controlled test (same squads, same tactics, 20 matches), Simeone's attributes cut goals conceded from 1.05 to 0.75 and Guardiola's held the opponent to 6.8 shots instead of 9.8. Coaches appear as initials avatars, no photos.
 - **Commentary** in Russian and English, live stats, line-ups with fatigue and live ratings, hover cards with player attributes.
 - **Match report**: momentum chart, cumulative xG race, shot map (size = xG), per-player heat maps, ratings and player of the match.
 - **League mode**: double round-robin season, table with xG difference and form, top scorers; rounds are simulated in parallel in a **Web Worker pool**; any fixture can be watched live instead.
@@ -27,6 +28,7 @@ src/engine/
   ai/carrier.ts  on-ball decisions: options → expected value → softmax choice → execution with skill noise
   ai/offball.ts  team shape, pressing, marking, support angles, runs in behind, box filling
   ai/goalkeeper.ts, ai/setpieces.ts
+src/data/coaches.ts  coach profiles: formations, instructions, 1–20 attributes, style notes (RU/EN)
 ```
 
 **On-ball decisions.** Every option — pass to feet, through ball, lofted ball, cross, shot, six dribble directions, shielding, clearance — is scored as an expected change in possession value:
@@ -52,19 +54,19 @@ npm run calibrate -- 60 --fast   # aggregate match numbers vs. top-flight averag
 npm run fit-xg -- 60             # conversion by distance vs. real football + logistic xG fit
 ```
 
-Latest run (48 matches, all eight clubs):
+Latest run (48 matches, all eight clubs with their head coaches):
 
 | per match | PitchMind | real top-flight |
 |---|---:|---:|
-| Goals | 3.02 | ~2.7 |
-| Shots | 25.7 | ~25 |
+| Goals | 3.15 | ~2.7 |
+| Shots | 26.8 | ~25 |
 | Shots on target | 10.3 | ~8.5 |
-| Goals / xG | 0.90 | 1.0 |
-| Fouls | 24.4 | ~22 |
-| Yellow cards | 4.1 | ~4 |
-| Penalties | 0.19 | ~0.3 |
-| Offsides | 5.2 | ~4 |
-| Draws | 31 % | ~25 % |
+| Goals / xG | 0.78 | 1.0 |
+| Fouls | 27.5 | ~22 |
+| Yellow cards | 3.8 | ~4 |
+| Penalties | 0.46 | ~0.3 |
+| Offsides | 7.0 | ~4 |
+| Draws | 15 % | ~25 % |
 
 Open-play conversion by distance (1,205 shots):
 

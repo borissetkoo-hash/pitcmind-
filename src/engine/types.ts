@@ -35,7 +35,7 @@ export interface PlayerData {
   attrs: Attributes;
 }
 
-export type FormationId = '4-4-2' | '4-3-3' | '4-2-3-1' | '3-5-2' | '5-3-2' | '4-1-4-1';
+export type FormationId = '4-4-2' | '4-3-3' | '4-2-3-1' | '3-5-2' | '5-3-2' | '4-1-4-1' | '3-4-3' | '3-4-2-1';
 
 export interface Tactics {
   formation: FormationId;
@@ -59,6 +59,17 @@ export interface Tactics {
   crossing: number;
 }
 
+/** Coaching attributes, 1–20 (10 = neutral). See data/coaches.ts for what each one drives. */
+export interface CoachTraits {
+  passing: number;
+  organisation: number;
+  pressing: number;
+  counter: number;
+  setPieces: number;
+  aerial: number;
+  fitness: number;
+}
+
 export interface ClubData {
   id: string;
   name: string;
@@ -68,6 +79,8 @@ export interface ClubData {
   keeperColors: { primary: string; text: string };
   tactics: Tactics;
   players: PlayerData[];
+  /** Head coach (see data/coaches.ts). */
+  coachId?: string;
 }
 
 export const DEFAULT_TACTICS: Tactics = {

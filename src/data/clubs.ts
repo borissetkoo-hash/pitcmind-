@@ -1,5 +1,6 @@
 import { Rng, hashString } from '../engine/rng';
-import type { Attributes, ClubData, PlayerData, Role, Tactics } from '../engine/types';
+import type { Attributes, ClubData, PlayerData, Role } from '../engine/types';
+import { coachById, coachTactics } from './coaches';
 import { FIRST_NAMES, LAST_NAMES } from './names';
 
 interface ClubSeed {
@@ -11,27 +12,27 @@ interface ClubSeed {
   primary: string;
   secondary: string;
   text: string;
-  tactics: Tactics;
+  coach: string;
 }
 
 /** Fictional league. Strength is the average attribute level the squad is generated around. */
 const SEEDS: ClubSeed[] = [
   { id: 'nrd', name: 'Nordhavn Athletic', short: 'NOR', city: 'Nordhavn', strength: 78, primary: '#1d4ed8', secondary: '#ffffff', text: '#ffffff',
-    tactics: { formation: '4-3-3', mentality: 1, pressing: 0.8, lineHeight: 0.75, width: 0.75, directness: 0.3, shootingRange: 0.5, tempo: 0.75, tackling: 0.55, crossing: 0.4 } },
+    coach: 'guardiola' },
   { id: 'vlr', name: 'Valoria FC', short: 'VAL', city: 'Valoria', strength: 77, primary: '#b91c1c', secondary: '#fbbf24', text: '#ffffff',
-    tactics: { formation: '4-2-3-1', mentality: 0.5, pressing: 0.6, lineHeight: 0.6, width: 0.6, directness: 0.45, shootingRange: 0.65, tempo: 0.6, tackling: 0.5, crossing: 0.5 } },
+    coach: 'ancelotti' },
   { id: 'kst', name: 'Kestrel United', short: 'KES', city: 'Kestrel', strength: 74, primary: '#111827', secondary: '#f59e0b', text: '#f59e0b',
-    tactics: { formation: '3-5-2', mentality: 0.5, pressing: 0.55, lineHeight: 0.55, width: 0.7, directness: 0.5, shootingRange: 0.45, tempo: 0.55, tackling: 0.6, crossing: 0.65 } },
+    coach: 'conte' },
   { id: 'arg', name: 'Argent City', short: 'ARG', city: 'Argent', strength: 72, primary: '#7dd3fc', secondary: '#0c4a6e', text: '#0c4a6e',
-    tactics: { formation: '4-3-3', mentality: 0, pressing: 0.5, lineHeight: 0.5, width: 0.65, directness: 0.25, shootingRange: 0.35, tempo: 0.35, tackling: 0.4, crossing: 0.35 } },
+    coach: 'arteta' },
   { id: 'brk', name: 'Brakwater Rovers', short: 'BRK', city: 'Brakwater', strength: 70, primary: '#15803d', secondary: '#ffffff', text: '#ffffff',
-    tactics: { formation: '4-4-2', mentality: 0, pressing: 0.45, lineHeight: 0.45, width: 0.6, directness: 0.65, shootingRange: 0.6, tempo: 0.5, tackling: 0.6, crossing: 0.75 } },
+    coach: 'dyche' },
   { id: 'ost', name: 'Ostmark Sporting', short: 'OST', city: 'Ostmark', strength: 69, primary: '#7c3aed', secondary: '#e9d5ff', text: '#ffffff',
-    tactics: { formation: '4-1-4-1', mentality: -0.5, pressing: 0.4, lineHeight: 0.4, width: 0.5, directness: 0.45, shootingRange: 0.5, tempo: 0.4, tackling: 0.45, crossing: 0.5 } },
+    coach: 'simeone' },
   { id: 'ptr', name: 'Port Rhenna', short: 'PRH', city: 'Rhenna', strength: 67, primary: '#ea580c', secondary: '#1f2937', text: '#ffffff',
-    tactics: { formation: '4-4-2', mentality: 0.5, pressing: 0.65, lineHeight: 0.55, width: 0.7, directness: 0.7, shootingRange: 0.7, tempo: 0.7, tackling: 0.7, crossing: 0.6 } },
+    coach: 'iraola' },
   { id: 'hlm', name: 'Holmgard Town', short: 'HOL', city: 'Holmgard', strength: 65, primary: '#facc15', secondary: '#1e3a8a', text: '#1e3a8a',
-    tactics: { formation: '5-3-2', mentality: -1, pressing: 0.35, lineHeight: 0.3, width: 0.45, directness: 0.7, shootingRange: 0.55, tempo: 0.35, tackling: 0.65, crossing: 0.7 } },
+    coach: 'mourinho' },
 ];
 
 const ATTR_KEYS: (keyof Attributes)[] = [
@@ -92,7 +93,7 @@ function buildClub(s: ClubSeed): ClubData {
     id: s.id, name: s.name, short: s.short, city: s.city,
     colors: { primary: s.primary, secondary: s.secondary, text: s.text },
     keeperColors: { primary: '#10b981', text: '#052e16' },
-    tactics: s.tactics, players,
+    tactics: coachTactics(coachById(s.coach)!), coachId: s.coach, players,
   };
 }
 

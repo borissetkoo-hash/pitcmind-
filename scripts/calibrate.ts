@@ -2,6 +2,7 @@
  * Headless calibration run: plays many matches and compares aggregate numbers with
  * real top-flight football. Usage: npm run calibrate -- [matches]
  */
+import { coachById } from '../src/data/coaches';
 import { CLUBS } from '../src/data/clubs';
 import { Match } from '../src/engine/match';
 
@@ -15,7 +16,10 @@ const t0 = performance.now();
 for (let i = 0; i < N; i++) {
   const home = CLUBS[i % CLUBS.length];
   const away = CLUBS[(i * 3 + 1) % CLUBS.length === i % CLUBS.length ? (i + 1) % CLUBS.length : (i * 3 + 1) % CLUBS.length];
-  const m = new Match({ home, away, seed: 1000 + i, fast: process.argv.includes('--fast') });
+  const m = new Match({
+    home, away, seed: 1000 + i, fast: process.argv.includes('--fast'),
+    homeCoach: coachById(home.coachId)?.traits, awayCoach: coachById(away.coachId)?.traits,
+  });
   const r = m.runToEnd();
   const g = r.score[0] + r.score[1];
   goalDist.set(g, (goalDist.get(g) ?? 0) + 1);

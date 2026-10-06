@@ -7,6 +7,7 @@ import { resolveKits } from '../render/kits';
 import { type Frame, PitchRenderer } from '../render/renderer';
 import { installTooltips, momentumChart, statRows } from './charts';
 import { getSettings } from '../settings';
+import { coachAvatar, coachName } from './coachUi';
 import { renderReport } from './report';
 import { type MatchSetup, tacticsControls } from './setup';
 
@@ -44,7 +45,10 @@ export class MatchView {
   private el: Record<string, HTMLElement> = {};
 
   constructor(private root: HTMLElement, private setup: MatchSetup, private options: MatchViewOptions = {}) {
-    this.match = new Match({ home: setup.home, away: setup.away, homeTactics: setup.homeTactics, awayTactics: setup.awayTactics, seed: setup.seed });
+    this.match = new Match({
+      home: setup.home, away: setup.away, homeTactics: setup.homeTactics, awayTactics: setup.awayTactics, seed: setup.seed,
+      homeCoach: setup.homeCoach?.traits, awayCoach: setup.awayCoach?.traits,
+    });
     this.names = [setup.home.short, setup.away.short];
     this.build();
     this.match.onEvent((e) => this.onEvent(e));
@@ -368,6 +372,7 @@ export class MatchView {
     this.el.tabLineups.innerHTML = `<div class="team-switch">${[0, 1]
       .map((i) => `<button class="btn small" type="button" data-team="${i}" aria-pressed="${i === this.lineupTeam}">${esc(m.teams[i].club.name)}</button>`)
       .join('')}</div>
+      ${this.coachLine(this.lineupTeam)}
       <table class="lineup"><thead><tr><th>#</th><th>${t('player')}</th><th>${t('pos')}</th><th>${t('energy')}</th><th>${t('rating')}</th></tr></thead><tbody>${rows}</tbody></table>`;
     this.el.tabLineups.querySelectorAll<HTMLButtonElement>('[data-team]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -375,6 +380,11 @@ export class MatchView {
         this.renderLineups();
       }),
     );
+  }
+
+  private coachLine(team: 0 | 1): string {
+    const c = team === 0 ? this.setup.homeCoach : this.setup.awayCoach;
+    return c ? `<div class="coach-line">${coachAvatar(c, 28)}<span><span class="muted">${t('coach')}:</span> <b>${esc(coachName(c))}</b></span></div>` : '';
   }
 
   private renderTactics(): void {

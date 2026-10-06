@@ -12,7 +12,7 @@ import { Player } from './player';
 import { computeRatings } from './ratings';
 import { Rng } from './rng';
 import { Team, type TeamStats } from './team';
-import type { ClubData, Tactics } from './types';
+import type { ClubData, CoachTraits, Tactics } from './types';
 import { type Vec, angleDiff, clamp, dist, distToSegment, fromAngle, norm, sub, hyp } from './vec';
 
 export type RestartType = 'kickoff' | 'throwIn' | 'goalKick' | 'corner' | 'freeKick' | 'penalty';
@@ -79,6 +79,9 @@ export interface MatchConfig {
   seed: number;
   homeTactics?: Tactics;
   awayTactics?: Tactics;
+  /** Head coaches' attributes (1–20); omitted = neutral 10s. */
+  homeCoach?: CoachTraits;
+  awayCoach?: CoachTraits;
   /** Coarser time step for headless background simulation. */
   fast?: boolean;
 }
@@ -153,8 +156,8 @@ export class Match {
     this.ticksPerSecond = Math.round(1 / this.dt);
     this.seed = cfg.seed;
     this.rng = new Rng(cfg.seed);
-    const home = new Team(0, cfg.home, cfg.homeTactics ?? cfg.home.tactics, 1);
-    const away = new Team(1, cfg.away, cfg.awayTactics ?? cfg.away.tactics, -1);
+    const home = new Team(0, cfg.home, cfg.homeTactics ?? cfg.home.tactics, 1, cfg.homeCoach);
+    const away = new Team(1, cfg.away, cfg.awayTactics ?? cfg.away.tactics, -1, cfg.awayCoach);
     home.opponent = away;
     away.opponent = home;
     this.teams = [home, away];
@@ -332,7 +335,7 @@ export class Match {
         const ctx: KickContext = this.restartKick ?? (hands ? 'hands' : null);
         decideCarrier(this, carrier, ctx);
         this.restartKick = null;
-        if (ball.owner === carrier) carrier.decisionTimer = (0.4 + this.rng.next() * 0.5 - carrier.a.vision * 0.001) * tempoFactor(carrier.team.tactics.tempo);
+        if (ball.owner === carrier) carrier.decisionTimer = (0.4 + this.rng.next() * 0.5 - carrier.a.vision * 0.001) * tempoFactor(carrier.team.tactics.tempo) * this.counterTempo(carrier.team);
       }
       if (ball.owner === carrier) {
         if (hands) {
@@ -365,6 +368,16 @@ export class Match {
       this.resolveContacts();
       if (this.phase === 'play' && !ball.owner) this.checkBallOut();
     }
+  }
+
+  /** True for a few seconds after a team wins the ball: the counter-attack window. */
+  onCounter(team: Team): boolean {
+    return this.clock - team.wonBallAt < 8;
+  }
+
+  /** Counter-attacking coaches release the ball quicker right after a turnover. */
+  private counterTempo(team: Team): number {
+    return this.onCounter(team) ? 1 - 0.2 * team.coaching.counter : 1;
   }
 
   /** A defender standing in the dribbler's path forces him to slow down and beat him. */
@@ -487,7 +500,7 @@ export class Match {
       if (isGoalSide) this.goalSide.add(o);
       else this.goalSide.delete(o);
       if (was && !isGoalSide && od < 2.4 && o.tackleCooldown <= 0) {
-        const pBeat = clamp(0.42 + (carrier.a.dribbling - o.a.tackling) / 220 + (carrier.speed - o.speed) * 0.02, 0.15, 0.75);
+        const pBeat = clamp(0.42 + (carrier.a.dribbling - o.a.tackling) / 220 + (carrier.speed - o.speed) * 0.02 - o.team.coaching.organisation * 0.08, 0.15, 0.75);
         o.stats.tackles++;
         o.team.stats.tackles++;
         if (this.rng.chance(pBeat)) {
@@ -511,15 +524,15 @@ export class Match {
       const d = Math.min(dist(o.pos, this.ball.pos), dist(o.pos, carrier.pos) + 0.3);
       if (d > 1.6) continue;
       const aggression = o.team.tactics.tackling;
-      const rate = (0.35 + o.team.tactics.pressing * 0.15) * (0.6 + aggression * 0.8) * dt;
+      const rate = (0.35 + o.team.tactics.pressing * 0.15) * (0.6 + aggression * 0.8) * (1 + 0.2 * o.team.coaching.pressing) * dt;
       if (!this.rng.chance(rate)) continue;
       o.stats.tackles++;
       o.team.stats.tackles++;
       const toO = Math.atan2(o.pos.y - carrier.pos.y, o.pos.x - carrier.pos.x);
       const behind = Math.abs(angleDiff(carrier.facing, toO)) > 2.1;
-      const pWin = clamp(0.58 + (aggression - 0.5) * 0.08 + (o.a.tackling - carrier.a.dribbling) / 260 - (behind ? 0.1 : 0) + (carrier.possessionTime < 0.4 ? 0.08 : 0), 0.15, 0.85);
+      const pWin = clamp(0.58 + (aggression - 0.5) * 0.08 + o.team.coaching.pressing * 0.04 + (o.a.tackling - carrier.a.dribbling) / 260 - (behind ? 0.1 : 0) + (carrier.possessionTime < 0.4 ? 0.08 : 0), 0.15, 0.85);
       const careful = isInOwnBox(o, carrier.pos) ? 0.12 : 1; // nobody wants to give away a penalty
-      const pFoul = clamp(0.025 + (behind ? 0.07 : 0) + (100 - o.a.tackling) / 1000 + (o.energy < 0.5 ? 0.03 : 0), 0.015, 0.3) * careful * (0.5 + aggression);
+      const pFoul = clamp(0.025 + (behind ? 0.07 : 0) + (100 - o.a.tackling) / 1000 + (o.energy < 0.5 ? 0.03 : 0), 0.015, 0.3) * careful * (0.6 + aggression * 0.8);
       const r = this.rng.next();
       if (r < pFoul) {
         this.foul(o, carrier, behind);
@@ -557,8 +570,8 @@ export class Match {
     // Denying an obvious goal-scoring opportunity: central, near goal, no covering defender.
     const lastMan = vl.x > 82 && Math.abs(vl.y - MID_Y) < 14 &&
       offender.team.active.filter((p) => !p.isGK && p !== offender && toLocal(p.pos, victim.team.dir).x > vl.x).length === 0;
-    const yellowP = (0.07 + (fromBehind ? 0.1 : 0) + (dangerous ? 0.08 : 0)) * (offender.yellow ? 0.5 : 1);
-    const redP = 0.003 + (lastMan ? 0.12 : 0);
+    const yellowP = (0.06 + (fromBehind ? 0.09 : 0) + (dangerous ? 0.07 : 0)) * (offender.yellow ? 0.4 : 1);
+    const redP = 0.002 + (lastMan ? 0.1 : 0);
     if (this.rng.chance(redP)) this.sendOff(offender, false);
     else if (this.rng.chance(yellowP)) {
       offender.yellow++;
@@ -595,7 +608,10 @@ export class Match {
       const keeperZone = p.isGK && isInOwnBox(p, ball.pos);
       // Defenders throw bodies in front of shots: a slightly bigger blocking radius.
       const shotIncoming = this.ball.flight?.kind === 'shot' && this.ball.flight.from.team !== p.team;
-      const reach = keeperZone ? keeperReach(p) : shotIncoming ? CONTROL_RADIUS + 0.1 : CONTROL_RADIUS;
+      // Organised defences read passes and throw bodies in front of shots: a slightly bigger reach.
+      const opponentBall = this.ball.flight && this.ball.flight.from.team !== p.team && this.ball.flight.kind !== 'deflection';
+      const anticipation = opponentBall ? Math.max(0, 0.15 * p.team.coaching.organisation) : 0;
+      const reach = keeperZone ? keeperReach(p) : (shotIncoming ? CONTROL_RADIUS + 0.1 : CONTROL_RADIUS) + anticipation;
       const seg = distToSegment(p.pos, ball.prev, ball.pos);
       if (seg.d > reach) continue;
       const z = ball.prevZ + (ball.z - ball.prevZ) * seg.t;
@@ -615,7 +631,7 @@ export class Match {
 
     if (fromOpponentShot) {
       // Outfield block.
-      if (this.rng.chance(0.8)) {
+      if (this.rng.chance(clamp(0.8 + 0.1 * p.team.coaching.organisation, 0.6, 0.95))) {
         this.resolveShot('blocked');
         this.emit('blocked', f.from.team.index, f.from, p.data.name);
         this.deflect(p, 0.35);
@@ -632,7 +648,7 @@ export class Match {
 
     const rel = hyp(ball.vel.x - p.vel.x, ball.vel.y - p.vel.y);
     const hard = Math.max(0, (rel - 7) / 12);
-    const fail = (0.02 + hard * hard * 0.28 + best.z * 0.12) * (1.45 - p.a.firstTouch / 100);
+    const fail = (0.02 + hard * hard * 0.28 + best.z * 0.12) * (1.45 - p.a.firstTouch / 100) * (1 - 0.25 * p.team.coaching.passing);
     const pControl = clamp(1 - fail, 0.1, 0.99);
     if (this.rng.chance(pControl)) this.gainPossession(p);
     else this.deflect(p, 0.45);
@@ -645,7 +661,7 @@ export class Match {
       const skill = gk.a.goalkeeping;
       // Reaction time is everything: close-range shots give the keeper almost no time.
       const flightTime = this.clock - ball.flight!.startTime;
-      const reaction = 0.99 - 0.52 * Math.exp(-(flightTime - 0.08) / 0.3);
+      const reaction = 0.99 - 0.46 * Math.exp(-(flightTime - 0.08) / 0.3);
       const atBody = dist(gk.pos, ball.pos) < 0.7 ? 0.15 : 0;
       const pSave = clamp(reaction + atBody + (skill - 75) / 100 - (gk.dive ? 0.04 : 0), 0.08, 0.97);
       if (this.rng.chance(pSave)) {
@@ -684,8 +700,8 @@ export class Match {
     let p = first;
     const rival = first.team.opponent.active.find((o) => !o.isGK && dist(o.pos, first.pos) < 1.6 && o.kickCooldown <= 0);
     if (rival) {
-      const mine = first.a.heading + this.rng.normal(0, 18);
-      const theirs = rival.a.heading + this.rng.normal(0, 18);
+      const mine = first.a.heading + first.team.coaching.aerial * 8 + this.rng.normal(0, 18);
+      const theirs = rival.a.heading + rival.team.coaching.aerial * 8 + this.rng.normal(0, 18);
       const loser = theirs > mine ? first : rival;
       p = theirs > mine ? rival : first;
       loser.kickCooldown = 0.5;
@@ -696,7 +712,7 @@ export class Match {
       this.callOffside(p);
       return;
     }
-    if (this.rng.chance(0.15 + (100 - p.a.heading) / 400)) {
+    if (this.rng.chance(0.15 + (100 - p.a.heading) / 400 - team.coaching.aerial * 0.05)) {
       this.deflect(p, 0.5);
       return;
     }
@@ -796,7 +812,10 @@ export class Match {
     }
     this.completePassIfAny(p);
     if (ball.flight?.kind === 'shot') this.resolveShot('off');
-    if (ball.lastTouch && ball.lastTouch.team !== p.team) this.lastPass = null;
+    if (ball.lastTouch && ball.lastTouch.team !== p.team) {
+      this.lastPass = null;
+      p.team.wonBallAt = this.clock;
+    }
     ball.owner = p;
     ball.lastTouch = p;
     ball.flight = null;

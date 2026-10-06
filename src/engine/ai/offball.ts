@@ -93,10 +93,12 @@ export function baseShape(team: Team, ballPos: Vec, inPoss: boolean, offLine: nu
     width = 44 + t.width * 20;
     shift = 0.22;
   } else {
+    // Well-organised teams defend in a tighter, narrower block.
+    const org = team.coaching.organisation;
     anchor = clamp(ballL.x - 12 + t.lineHeight * 14 + m * 3, 22, 66);
-    depth = 31 + (1 - t.pressing) * 4;
+    depth = 31 + (1 - t.pressing) * 4 - org * 3;
     // Near our own box the block narrows to protect the goal mouth.
-    width = 36 + t.width * 4 - (ballL.x < 35 ? 8 : 0);
+    width = 36 + t.width * 4 - (ballL.x < 35 ? 8 : 0) - org * 6;
     shift = ballL.x < 35 ? 0.3 : 0.42;
   }
   const shape = new Map<Player, Vec>();
@@ -192,7 +194,8 @@ function attackingMovement(match: Match, team: Team, _ctx: AIContext, outfield: 
     const line = ROLE_LINE[p.role];
     const runner = line === 'att' || p.role === 'AM' || ((p.role === 'LWB' || p.role === 'RWB') && team.tactics.mentality > 0);
     if (!runner || cl.x < 35) continue;
-    if (p.runTimer <= 0 && match.rng.chance(0.012 + team.tactics.mentality * 0.003)) p.runTimer = 2.2 + match.rng.next();
+    const counterRuns = match.onCounter(team) ? 1 + 0.8 * team.coaching.counter : 1;
+    if (p.runTimer <= 0 && match.rng.chance((0.012 + team.tactics.mentality * 0.003) * Math.max(0.2, counterRuns))) p.runTimer = 2.2 + match.rng.next();
     if (p.runTimer > 0) {
       const pl = toLocal(p.pos, dir);
       const goalPull = (MID_Y - pl.y) * 0.25;
@@ -258,7 +261,7 @@ function defendingMovement(match: Match, team: Team, outfield: Player[]): void {
       const deep = ballL.x > 60; // carrier is deep in his own half
       const standOff = deep ? 2.5 + (1 - t.pressing) * 5 : 0.7;
       const toGoal = norm(sub(ownGoal, carrier.pos));
-      const close = dist(p1.pos, carrier.pos) < 4.5;
+      const close = dist(p1.pos, carrier.pos) < 4.5 + 1.5 * team.coaching.pressing;
       if (close && !deep) {
         // Engage: attack the ball where it will be in a moment rather than shadowing the dribbler.
         p1.target = { x: ball.pos.x + carrier.vel.x * 0.35, y: ball.pos.y + carrier.vel.y * 0.35 };
@@ -312,7 +315,7 @@ function defendingMovement(match: Match, team: Team, outfield: Player[]): void {
       x: o.pos.x + goalSide.x * gap + ballSide.x * 0.6,
       y: o.pos.y + goalSide.y * gap + ballSide.y * 0.6,
     };
-    const tight = danger ? 0.9 : ROLE_LINE[mk.role] === 'def' ? 0.7 : 0.55;
+    const tight = Math.min(0.97, (danger ? 0.9 : ROLE_LINE[mk.role] === 'def' ? 0.7 : 0.55) + 0.08 * team.coaching.organisation);
     mk.target = lerp(mk.target, markPos, tight);
     mk.intensity = Math.max(mk.intensity, 0.75);
   }

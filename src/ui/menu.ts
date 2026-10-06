@@ -20,6 +20,7 @@ export function renderMenu(root: HTMLElement, season: SeasonState, onLangChange:
         <div class="menu-title"><span class="brand-mark">◉</span> PitchMind</div>
         <a class="menu-item primary" href="#/match"><b>⚽ ${t('menuQuick')}</b><span>${t('menuQuickSub')}</span></a>
         <a class="menu-item" href="#/league"><b>🏆 ${played ? t('menuContinue') : t('menuSeason')}</b><span>${t('menuSeasonSub')}</span></a>
+        <a class="menu-item" href="#/coaches"><b>👔 ${t('menuCoaches')}</b><span>${t('menuCoachesSub')}</span></a>
         <a class="menu-item" href="#/about"><b>🧠 ${t('navAbout')}</b><span>${t('menuAboutSub')}</span></a>
         <button class="menu-item" type="button" id="openSettings"><b>⚙ ${t('settings')}</b><span>${t('settingsSub')}</span></button>
       </nav>

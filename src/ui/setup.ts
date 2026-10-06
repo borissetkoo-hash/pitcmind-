@@ -1,4 +1,6 @@
+import { type Coach, coachById, coachTactics } from '../data/coaches';
 import { CLUBS, clubById } from '../data/clubs';
+import { coachCard, coachSelectHtml } from './coachUi';
 import { overall } from '../engine/attributes';
 import { FORMATIONS, FORMATION_IDS } from '../engine/formations';
 import { pickLineup } from '../engine/team';
@@ -10,6 +12,8 @@ export interface MatchSetup {
   away: ClubData;
   homeTactics: Tactics;
   awayTactics: Tactics;
+  homeCoach?: Coach;
+  awayCoach?: Coach;
   seed: number;
 }
 
@@ -77,6 +81,8 @@ export function renderSetup(container: HTMLElement, initial: Partial<MatchSetup>
     away: initial.away ?? CLUBS[1],
     homeTactics: withDefaults(initial.homeTactics ?? (initial.home ?? CLUBS[0]).tactics),
     awayTactics: withDefaults(initial.awayTactics ?? (initial.away ?? CLUBS[1]).tactics),
+    homeCoach: initial.homeCoach ?? coachById((initial.home ?? CLUBS[0]).coachId),
+    awayCoach: initial.awayCoach ?? coachById((initial.away ?? CLUBS[1]).coachId),
     seed: initial.seed ?? Math.floor(Math.random() * 1e6),
   };
 
@@ -100,18 +106,29 @@ export function renderSetup(container: HTMLElement, initial: Partial<MatchSetup>
     const card = container.querySelector<HTMLElement>(`[data-side="${side}"]`)!;
     const club = state[side];
     const tac = side === 'home' ? state.homeTactics : state.awayTactics;
+    const coach = side === 'home' ? state.homeCoach : state.awayCoach;
     const st = strength(club, tac.formation);
     card.innerHTML = `
       <div class="team-head">
         <div class="crest" style="background:${club.colors.primary};color:${club.colors.text};border-color:${club.colors.secondary}">${club.short}</div>
-        <select aria-label="${t(side)}">${CLUBS.map((c) => `<option value="${c.id}" ${c.id === club.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+        <select class="club-select" aria-label="${t(side)}">${CLUBS.map((c) => `<option value="${c.id}" ${c.id === club.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       </div>
-      <div class="squad-strength"><span>${t(side)}</span><span>OVR <b>${st.ovr}</b></span><span>DEF <b>${st.def}</b></span><span>MID <b>${st.mid}</b></span><span>ATT <b>${st.att}</b></span></div>`;
-    card.querySelector('select')!.addEventListener('change', (e) => {
+      <div class="squad-strength"><span>${t(side)}</span><span>OVR <b>${st.ovr}</b></span><span>DEF <b>${st.def}</b></span><span>MID <b>${st.mid}</b></span><span>ATT <b>${st.att}</b></span></div>
+      <div class="coach-pick"><label class="muted">${t('coach')}</label>${coachSelectHtml(coach?.id)}</div>
+      ${coach ? coachCard(coach, true) : ''}`;
+    card.querySelector('.club-select')!.addEventListener('change', (e) => {
       const c = clubById((e.target as HTMLSelectElement).value);
       state[side] = c;
-      if (side === 'home') state.homeTactics = withDefaults(c.tactics);
-      else state.awayTactics = withDefaults(c.tactics);
+      const cc = coachById(c.coachId);
+      if (side === 'home') (state.homeTactics = withDefaults(c.tactics)), (state.homeCoach = cc);
+      else (state.awayTactics = withDefaults(c.tactics)), (state.awayCoach = cc);
+      renderCard(side);
+    });
+    // Picking a coach brings his preferred formation and instructions with him.
+    card.querySelector('.coach-select')!.addEventListener('change', (e) => {
+      const cc = coachById((e.target as HTMLSelectElement).value)!;
+      if (side === 'home') (state.homeCoach = cc), (state.homeTactics = coachTactics(cc));
+      else (state.awayCoach = cc), (state.awayTactics = coachTactics(cc));
       renderCard(side);
     });
     card.appendChild(

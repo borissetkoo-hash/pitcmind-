@@ -262,7 +262,7 @@ export function shoot(match: Match, p: Player, penalty: boolean, xg: number, fre
   const d = hyp(PITCH.length - me.x, MID_Y - me.y);
   const skill = (header ? p.a.heading : p.a.shooting) / 100;
   const pressure = pressureOn(p);
-  const sdY = (penalty ? 0.55 : 1.45 + d * 0.12 * (1.3 - skill)) + pressure * 1.0;
+  const sdY = (penalty ? 0.55 : 1.7 + d * 0.12 * (1.3 - skill)) + pressure * 1.0;
   const sdZ = (penalty ? 0.35 : 0.4 + d * 0.05 * (1.3 - skill)) + pressure * 0.45;
   aimY += rng.normal(0, sdY);
   aimZ = Math.max(0.05, aimZ + rng.normal(0, sdZ));

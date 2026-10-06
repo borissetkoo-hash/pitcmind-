@@ -41,7 +41,7 @@ console.table({
   'goals / xG': [(agg.goals / agg.xg).toFixed(2), '1.0'],
   'passes / match': [per(agg.passes), '900'],
   'pass completion %': [((agg.completed / agg.passes) * 100).toFixed(1), '82'],
-  'tackles / match': [per(agg.tackles), '35'],
+  'duels / match': [per(agg.tackles), '~200'],
   'fouls / match': [per(agg.fouls), '22'],
   'corners / match': [per(agg.corners), '10'],
   'offsides / match': [per(agg.offsides), '4'],

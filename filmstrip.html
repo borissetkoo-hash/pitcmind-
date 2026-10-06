@@ -1,0 +1,25 @@
+<!doctype html><html><body style="margin:0;background:#111;display:flex;flex-wrap:wrap;width:1220px">
+<title>Film-strip debugger</title><pre id="info" style="color:#ddd;font:11px monospace;margin:4px;width:100%"></pre>
+<script type="module">
+import { CLUBS } from './src/data/clubs.ts';
+import { Match } from './src/engine/match.ts';
+import { PitchRenderer } from './src/render/renderer.ts';
+const q = new URLSearchParams(location.search);
+const m = new Match({ home: CLUBS[+(q.get('h') ?? 0)], away: CLUBS[+(q.get('a') ?? 1)], seed: +(q.get('seed') ?? 7) });
+const t0 = +(q.get('t') ?? 60), n = +(q.get('n') ?? 1), step = +(q.get('dt') ?? 1);
+const big = n === 1;
+let info = '';
+while (m.clock < t0) m.step();
+for (let i = 0; i < n; i++) {
+  const c = document.createElement('canvas');
+  c.style.width = big ? '1200px' : '400px'; c.style.height = big ? '800px' : '270px'; c.style.display = 'block';
+  document.body.appendChild(c);
+  const r = new PitchRenderer(c); r.resize();
+  r.draw(m, PitchRenderer.frame(m, 1), { names: q.has('names'), aiVision: !q.has('novision'), trails: false });
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.font = '14px monospace'; g.fillText(`${m.clock.toFixed(1)} ${m.phase} ${m.restart?.type ?? ''} own:${m.ball.owner?.data.number ?? '-'}/${m.ball.owner?.team.index ?? ''} fl:${m.ball.flight?.kind ?? ''} z:${m.ball.z.toFixed(1)}`, 8, 16);
+  info += `${m.clock.toFixed(1)} ${m.debug ? m.debug.carrier.data.number + ':' + m.debug.chosen?.kind + ' ' + (m.debug.chosen?.utility ?? 0).toFixed(3) : ''}\n`;
+  const end = m.clock + step; while (m.clock < end) m.step();
+}
+document.getElementById('info').textContent = `score ${m.score}\n` + m.events.filter(e=>e.time>t0-5).slice(0,20).map(e=>`${e.minute} ${e.type} ${e.team} ${e.player??''}`).join('\n');
+window.done = true;
+</script></body></html>

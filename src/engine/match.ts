@@ -590,7 +590,9 @@ export class Match {
     for (const p of this.allPlayers) {
       if (p.kickCooldown > 0) continue;
       const keeperZone = p.isGK && isInOwnBox(p, ball.pos);
-      const reach = keeperZone ? keeperReach(p) : CONTROL_RADIUS;
+      // Defenders throw bodies in front of shots: a slightly bigger blocking radius.
+      const shotIncoming = this.ball.flight?.kind === 'shot' && this.ball.flight.from.team !== p.team;
+      const reach = keeperZone ? keeperReach(p) : shotIncoming ? CONTROL_RADIUS + 0.1 : CONTROL_RADIUS;
       const seg = distToSegment(p.pos, ball.prev, ball.pos);
       if (seg.d > reach) continue;
       const z = ball.prevZ + (ball.z - ball.prevZ) * seg.t;
@@ -610,7 +612,7 @@ export class Match {
 
     if (fromOpponentShot) {
       // Outfield block.
-      if (this.rng.chance(0.75)) {
+      if (this.rng.chance(0.8)) {
         this.resolveShot('blocked');
         this.emit('blocked', f.from.team.index, f.from, p.data.name);
         this.deflect(p, 0.35);
@@ -640,7 +642,7 @@ export class Match {
       const skill = gk.a.goalkeeping;
       // Reaction time is everything: close-range shots give the keeper almost no time.
       const flightTime = this.clock - ball.flight!.startTime;
-      const reaction = 0.98 - 0.58 * Math.exp(-(flightTime - 0.08) / 0.3);
+      const reaction = 0.99 - 0.52 * Math.exp(-(flightTime - 0.08) / 0.3);
       const atBody = dist(gk.pos, ball.pos) < 0.7 ? 0.15 : 0;
       const pSave = clamp(reaction + atBody + (skill - 75) / 100 - (gk.dive ? 0.04 : 0), 0.08, 0.97);
       if (this.rng.chance(pSave)) {

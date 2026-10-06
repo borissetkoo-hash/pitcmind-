@@ -95,8 +95,9 @@ export function baseShape(team: Team, ballPos: Vec, inPoss: boolean, offLine: nu
   } else {
     anchor = clamp(ballL.x - 12 + t.lineHeight * 14 + m * 3, 22, 66);
     depth = 31 + (1 - t.pressing) * 4;
-    width = 36 + t.width * 4;
-    shift = 0.42;
+    // Near our own box the block narrows to protect the goal mouth.
+    width = 36 + t.width * 4 - (ballL.x < 35 ? 8 : 0);
+    shift = ballL.x < 35 ? 0.3 : 0.42;
   }
   const shape = new Map<Player, Vec>();
   for (const p of team.active) {
@@ -305,11 +306,13 @@ function defendingMovement(match: Match, team: Team, outfield: Player[]): void {
     marked.add(o);
     const goalSide = norm(sub(ownGoal, o.pos));
     const ballSide = norm(sub(ball.pos, o.pos));
+    const danger = toLocal(o.pos, dir).x < 25; // in or around our box: get touch-tight
+    const gap = danger ? 1.0 : 1.6;
     const markPos = {
-      x: o.pos.x + goalSide.x * 1.6 + ballSide.x * 0.6,
-      y: o.pos.y + goalSide.y * 1.6 + ballSide.y * 0.6,
+      x: o.pos.x + goalSide.x * gap + ballSide.x * 0.6,
+      y: o.pos.y + goalSide.y * gap + ballSide.y * 0.6,
     };
-    const tight = ROLE_LINE[mk.role] === 'def' ? 0.7 : 0.55;
+    const tight = danger ? 0.9 : ROLE_LINE[mk.role] === 'def' ? 0.7 : 0.55;
     mk.target = lerp(mk.target, markPos, tight);
     mk.intensity = Math.max(mk.intensity, 0.75);
   }

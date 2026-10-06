@@ -52,6 +52,20 @@ const EN = `
 <h2>Stack</h2>
 <p>TypeScript, Canvas 2D, dependency-free SVG charts, Web Workers to simulate league rounds in parallel, Vite, Vitest. Zero runtime dependencies.</p>`;
 
+const ROWS: [string, string, string, string][] = [
+  ['goals', 'Голы', '3.02', '~2.7'],
+  ['shots', 'Удары', '25.7', '~25'],
+  ['on target', 'В створ', '10.3', '~8.5'],
+  ['goals / xG', 'Голы / xG', '0.90', '1.0'],
+  ['fouls', 'Фолы', '24.4', '~22'],
+  ['yellow cards', 'Жёлтые', '4.1', '~4'],
+  ['offsides', 'Офсайды', '5.2', '~4'],
+  ['draws', 'Ничьи', '31 %', '~25 %'],
+];
+
 export function renderAbout(root: HTMLElement): void {
-  root.innerHTML = `<article class="prose">${getLang() === 'ru' ? RU : EN}</article>`;
+  const ru = getLang() === 'ru';
+  root.innerHTML = `<article class="prose">${ru ? RU : EN}</article>`;
+  root.querySelector('#calib')!.innerHTML = `<table class="calib"><thead><tr><th>${ru ? 'за матч (48 матчей)' : 'per match (48 matches)'}</th><th>PitchMind</th><th>${ru ? 'топ-лиги' : 'top flight'}</th></tr></thead>
+    <tbody>${ROWS.map((r) => `<tr><td>${ru ? r[1] : r[0]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('')}</tbody></table>`;
 }

@@ -49,6 +49,14 @@ export interface Tactics {
   width: number;
   /** 0 … 1: short build-up (0) vs. direct, vertical play (1). */
   directness: number;
+  /** 0 … 1: only shoot from inside the box (0) … shoot on sight from distance (1). */
+  shootingRange: number;
+  /** 0 … 1: patient, slow circulation (0) … quick release, high tempo (1). */
+  tempo: number;
+  /** 0 … 1: stay on your feet (0) … fly into tackles (1): more ball wins, more fouls. */
+  tackling: number;
+  /** 0 … 1: how often wide players put the ball into the box. */
+  crossing: number;
 }
 
 export interface ClubData {
@@ -69,4 +77,11 @@ export const DEFAULT_TACTICS: Tactics = {
   lineHeight: 0.5,
   width: 0.6,
   directness: 0.4,
+  shootingRange: 0.5,
+  tempo: 0.5,
+  tackling: 0.5,
+  crossing: 0.5,
 };
+
+/** Fills in any tactic not specified (older saves, partial presets) with the neutral 0.5 default. */
+export const withDefaults = (t: Partial<Tactics>): Tactics => ({ ...DEFAULT_TACTICS, ...t });

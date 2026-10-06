@@ -6,9 +6,11 @@ PitchMind is a 2D football (soccer) match engine and web app written in TypeScri
 
 ## Features
 
+- **Loading screen and main menu** — a game hub with season status, clubs and settings (language, pitch orientation, match speed, auto replays).
+- **Portrait match view** (default): a tall pitch with your team attacking upwards, match stats and controls stacked on the right; landscape view available in settings.
 - **Live match** on Canvas with smooth interpolation, 1×–32× speed, instant result, broadcast scoreboard, auto **goal replays**.
 - **AI vision overlay** (`V`): see the ball carrier's evaluated options coloured by utility with success probabilities, both offside lines and every player's movement target.
-- **Tactics that matter** — formation (6 shapes), mentality, pressing, defensive line, width, directness — editable *during* the match.
+- **Tactics that matter** — formation (6 shapes), mentality, pressing, defensive line, width, directness, tempo, shooting range, crossing and tackling — editable *during* the match. Each instruction has a measurable effect, e.g. shooting range 0 → 0 % of shots from outside the box, 1 → 47 %; crossing 0 → ~1 cross a match, 1 → ~23; tackling 0 → 7 fouls, 1 → 14.
 - **Commentary** in Russian and English, live stats, line-ups with fatigue and live ratings, hover cards with player attributes.
 - **Match report**: momentum chart, cumulative xG race, shot map (size = xG), per-player heat maps, ratings and player of the match.
 - **League mode**: double round-robin season, table with xG difference and form, top scorers; rounds are simulated in parallel in a **Web Worker pool**; any fixture can be watched live instead.

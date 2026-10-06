@@ -1,7 +1,7 @@
 import { FORMATIONS, type Slot, roleFit } from './formations';
 import { Player } from './player';
 import { PITCH, toWorld } from './pitch';
-import type { ClubData, PlayerData, Tactics } from './types';
+import { type ClubData, type PlayerData, type Tactics, withDefaults } from './types';
 import { overall } from './attributes';
 
 export interface TeamStats {
@@ -62,7 +62,7 @@ export class Team {
   constructor(index: 0 | 1, club: ClubData, tactics: Tactics, dir: 1 | -1) {
     this.index = index;
     this.club = club;
-    this.tactics = { ...tactics };
+    this.tactics = withDefaults(tactics);
     this.dir = dir;
     const slots = FORMATIONS[this.tactics.formation];
     const { lineup, bench } = pickLineup(club.players, slots);
@@ -105,7 +105,7 @@ export class Team {
   /** Switch formation mid-match: players keep their order but take the new slots' roles. */
   setTactics(t: Tactics): void {
     const changed = t.formation !== this.tactics.formation;
-    this.tactics = { ...t };
+    this.tactics = withDefaults(t);
     if (!changed) return;
     const slots = this.slots;
     const outfield = this.players.filter((p) => !p.isGK);

@@ -6,6 +6,7 @@ import { commentary, t } from '../i18n';
 import { resolveKits } from '../render/kits';
 import { type Frame, PitchRenderer } from '../render/renderer';
 import { installTooltips, momentumChart, statRows } from './charts';
+import { getSettings } from '../settings';
 import { renderReport } from './report';
 import { type MatchSetup, tacticsControls } from './setup';
 
@@ -64,20 +65,21 @@ export class MatchView {
   private build(): void {
     const { home, away } = this.setup;
     const [hk, ak] = resolveKits(home, away);
-    this.root.innerHTML = `
-      <div class="match-layout">
-        <section>
+    const portrait = getSettings().verticalPitch;
+    const scoreboard = `
           <div class="panel scoreboard">
             <div class="sb-team"><span class="sb-kit" style="background:${hk.fill};border-color:${hk.stroke}"></span><span class="name">${esc(home.name)}</span></div>
             <div class="sb-center"><div class="sb-score num" id="score">0 : 0</div><div class="sb-clock" id="clock">0'</div><div class="sb-xg" id="xg">xG 0.00 – 0.00</div></div>
             <div class="sb-team away"><span class="name">${esc(away.name)}</span><span class="sb-kit" style="background:${ak.fill};border-color:${ak.stroke}"></span></div>
-          </div>
-          <div class="pitch-wrap">
+          </div>`;
+    const pitch = `
+          <div class="pitch-wrap ${portrait ? 'portrait' : ''}">
             <canvas id="pitch" aria-label="Pitch"></canvas>
             <div class="replay-badge" id="replayBadge">REPLAY</div>
             <div class="toast" id="toast"><div class="big">${t('goal')}</div><div id="toastText"></div></div>
             <div class="hover-card" id="hover"></div>
-          </div>
+          </div>`;
+    const controls = `
           <div class="controls">
             <button class="btn small" id="play" type="button"></button>
             <div class="seg" id="speeds" role="group" aria-label="${t('speed')}">${SPEEDS.map((s) => `<button type="button" data-s="${s}">${s}×</button>`).join('')}</div>
@@ -87,11 +89,10 @@ export class MatchView {
             <label class="toggle"><input type="checkbox" data-opt="names"> ${t('names')}</label>
             <label class="toggle"><input type="checkbox" data-opt="aiVision"> ${t('aiVision')}</label>
             <label class="toggle"><input type="checkbox" data-opt="trails" checked> ${t('trails')}</label>
-          </div>
-          <div class="panel below"><div class="card-title"><h3>${t('momentum')}</h3><span class="muted" id="poss"></span></div><div id="momentum"></div></div>
-          <div id="report"></div>
-        </section>
-        <aside class="panel side">
+          </div>`;
+    const momentum = `<div class="panel below"><div class="card-title"><h3>${t('momentum')}</h3><span class="muted" id="poss"></span></div><div id="momentum"></div></div>`;
+    const tabs = `
+          <aside class="panel side">
           <div class="tabs" role="tablist">
             <button role="tab" data-tab="feed">${t('commentary')}</button>
             <button role="tab" data-tab="stats">${t('stats')}</button>
@@ -102,15 +103,32 @@ export class MatchView {
           <div class="tab-body" id="tabStats" hidden></div>
           <div class="tab-body" id="tabLineups" hidden></div>
           <div class="tab-body" id="tabTactics" hidden></div>
-        </aside>
-      </div>`;
+        </aside>`;
+    // Portrait follows the design sketch: tall pitch on the left, match info stacked on the right.
+    this.root.innerHTML = portrait
+      ? `<div class="match-portrait">
+          <section class="pitch-col">${pitch}</section>
+          <section class="info-col">
+            ${scoreboard}
+            <div class="panel quick-stats"><div class="card-title"><h3>${t('liveStats')}</h3></div><div id="quickStats"></div></div>
+            ${controls}
+            ${tabs}
+            ${momentum}
+          </section>
+        </div>
+        <div id="report"></div>`
+      : `<div class="match-layout">
+          <section>${scoreboard}${pitch}${controls}${momentum}<div id="report"></div></section>
+          ${tabs}
+        </div>`;
     const q = <T extends HTMLElement>(sel: string) => this.root.querySelector<T>(sel)!;
-    for (const id of ['score', 'clock', 'xg', 'toast', 'toastText', 'hover', 'play', 'end', 'replay', 'replayBadge', 'momentum', 'poss', 'feed', 'tabFeed', 'tabStats', 'tabLineups', 'tabTactics', 'report']) {
-      this.el[id] = q(`#${id}`);
+    for (const id of ['score', 'clock', 'xg', 'toast', 'toastText', 'hover', 'play', 'end', 'replay', 'replayBadge', 'momentum', 'poss', 'feed', 'tabFeed', 'tabStats', 'tabLineups', 'tabTactics', 'report', 'quickStats']) {
+      const found = this.root.querySelector<HTMLElement>(`#${id}`);
+      if (found) this.el[id] = found;
     }
     const canvas = q<HTMLCanvasElement>('#pitch');
     this.renderer = new PitchRenderer(canvas);
-    this.renderer.resize();
+    this.renderer.setVertical(portrait);
     window.addEventListener('resize', this.onResize);
     window.addEventListener('keydown', this.onKey);
     installTooltips(this.root);
@@ -134,6 +152,8 @@ export class MatchView {
       this.el.hover.style.display = 'none';
     });
     this.setTab('feed');
+    this.speed = getSettings().defaultSpeed;
+    this.opts.autoReplay = getSettings().autoReplay;
     this.setSpeed(this.speed);
     this.setPlaying(true);
   }
@@ -293,7 +313,20 @@ export class MatchView {
     this.el.poss.textContent = `${t('possession')} ${ph}% – ${pa}%`;
     this.el.momentum.innerHTML = momentumChart(m.momentum, m.events, [this.setup.home.name, this.setup.away.name], '');
     if (this.tab === 'stats' || force) this.el.tabStats.innerHTML = this.statsHtml();
+    if (this.el.quickStats) this.el.quickStats.innerHTML = this.quickStatsHtml();
     if (this.tab === 'lineups') this.renderLineups();
+  }
+
+  /** The compact panel at the top-right of the portrait layout. */
+  quickStatsHtml(): string {
+    const [a, b] = this.match.teams.map((x) => x.stats);
+    const [ph, pa] = this.match.possession();
+    return statRows([
+      { label: t('possession'), a: ph, b: pa, fmt: (v) => `${Math.round(v)}%` },
+      { label: t('shots'), a: a.shots, b: b.shots },
+      { label: t('onTarget'), a: a.shotsOnTarget, b: b.shotsOnTarget },
+      { label: t('xg'), a: a.xg, b: b.xg, fmt: (v) => v.toFixed(2) },
+    ]);
   }
 
   statsHtml(): string {

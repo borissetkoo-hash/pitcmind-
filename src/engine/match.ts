@@ -100,6 +100,8 @@ export interface MatchResult {
 }
 
 export const DT = 1 / 30;
+/** Tempo instruction → multiplier on how long carriers take over each decision (0.5 = neutral). */
+const tempoFactor = (tempo: number) => 1.3 - tempo * 0.6;
 /** Background simulations (league rounds) use a coarser step: ~2x faster, same statistics. */
 export const FAST_DT = 1 / 20;
 const HALF_LENGTH = 45 * 60;
@@ -330,7 +332,7 @@ export class Match {
         const ctx: KickContext = this.restartKick ?? (hands ? 'hands' : null);
         decideCarrier(this, carrier, ctx);
         this.restartKick = null;
-        if (ball.owner === carrier) carrier.decisionTimer = 0.4 + this.rng.next() * 0.5 - carrier.a.vision * 0.001;
+        if (ball.owner === carrier) carrier.decisionTimer = (0.4 + this.rng.next() * 0.5 - carrier.a.vision * 0.001) * tempoFactor(carrier.team.tactics.tempo);
       }
       if (ball.owner === carrier) {
         if (hands) {
@@ -508,15 +510,16 @@ export class Match {
       // Tackles go for the ball, which sits half a metre in front of the dribbler.
       const d = Math.min(dist(o.pos, this.ball.pos), dist(o.pos, carrier.pos) + 0.3);
       if (d > 1.6) continue;
-      const rate = (0.35 + o.team.tactics.pressing * 0.15) * dt;
+      const aggression = o.team.tactics.tackling;
+      const rate = (0.35 + o.team.tactics.pressing * 0.15) * (0.6 + aggression * 0.8) * dt;
       if (!this.rng.chance(rate)) continue;
       o.stats.tackles++;
       o.team.stats.tackles++;
       const toO = Math.atan2(o.pos.y - carrier.pos.y, o.pos.x - carrier.pos.x);
       const behind = Math.abs(angleDiff(carrier.facing, toO)) > 2.1;
-      const pWin = clamp(0.58 + (o.a.tackling - carrier.a.dribbling) / 260 - (behind ? 0.1 : 0) + (carrier.possessionTime < 0.4 ? 0.08 : 0), 0.15, 0.85);
+      const pWin = clamp(0.58 + (aggression - 0.5) * 0.08 + (o.a.tackling - carrier.a.dribbling) / 260 - (behind ? 0.1 : 0) + (carrier.possessionTime < 0.4 ? 0.08 : 0), 0.15, 0.85);
       const careful = isInOwnBox(o, carrier.pos) ? 0.12 : 1; // nobody wants to give away a penalty
-      const pFoul = clamp(0.025 + (behind ? 0.07 : 0) + (100 - o.a.tackling) / 1000 + (o.energy < 0.5 ? 0.03 : 0), 0.015, 0.3) * careful;
+      const pFoul = clamp(0.025 + (behind ? 0.07 : 0) + (100 - o.a.tackling) / 1000 + (o.energy < 0.5 ? 0.03 : 0), 0.015, 0.3) * careful * (0.5 + aggression);
       const r = this.rng.next();
       if (r < pFoul) {
         this.foul(o, carrier, behind);
@@ -804,7 +807,7 @@ export class Match {
     p.stats.touches++;
     // Time to control and look up; good first touch buys time, pressure forces a quicker release.
     const settle = 0.25 + this.rng.next() * 0.55 * (1.3 - p.a.firstTouch / 100);
-    p.decisionTimer = hands ? 1.2 + this.rng.next() * 1.5 : settle * (1 - pressureOn(p) * 0.5);
+    p.decisionTimer = hands ? 1.2 + this.rng.next() * 1.5 : settle * (1 - pressureOn(p) * 0.5) * tempoFactor(p.team.tactics.tempo);
     p.action = { type: 'dribble', target: toWorld({ x: toLocal(p.pos, p.team.dir).x + 4, y: toLocal(p.pos, p.team.dir).y }, p.team.dir) };
     p.dive = null;
   }

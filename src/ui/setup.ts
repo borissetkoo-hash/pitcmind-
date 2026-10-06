@@ -2,7 +2,7 @@ import { CLUBS, clubById } from '../data/clubs';
 import { overall } from '../engine/attributes';
 import { FORMATIONS, FORMATION_IDS } from '../engine/formations';
 import { pickLineup } from '../engine/team';
-import type { ClubData, FormationId, Tactics } from '../engine/types';
+import { type ClubData, type FormationId, type Tactics, withDefaults } from '../engine/types';
 import { type Key, t } from '../i18n';
 
 export interface MatchSetup {
@@ -30,20 +30,23 @@ export function strength(club: ClubData, formation: FormationId) {
   return { ovr: avg(ovr), def: avg(lines.def), mid: avg(lines.mid), att: avg(lines.att) };
 }
 
-type SliderKey = 'mentality' | 'pressing' | 'lineHeight' | 'width' | 'directness';
+type SliderKey = 'mentality' | 'pressing' | 'lineHeight' | 'width' | 'directness' | 'shootingRange' | 'tempo' | 'tackling' | 'crossing';
 const SLIDERS: { key: SliderKey; min: number; max: number; step: number; ends: [Key, Key] }[] = [
   { key: 'mentality', min: -2, max: 2, step: 0.5, ends: ['defensive', 'attacking'] },
   { key: 'pressing', min: 0, max: 1, step: 0.05, ends: ['calm', 'intense'] },
   { key: 'lineHeight', min: 0, max: 1, step: 0.05, ends: ['low', 'high'] },
   { key: 'width', min: 0, max: 1, step: 0.05, ends: ['narrow', 'wide'] },
   { key: 'directness', min: 0, max: 1, step: 0.05, ends: ['short', 'direct'] },
+  { key: 'tempo', min: 0, max: 1, step: 0.05, ends: ['slow', 'fast'] },
+  { key: 'shootingRange', min: 0, max: 1, step: 0.05, ends: ['boxOnly', 'onSight'] },
+  { key: 'crossing', min: 0, max: 1, step: 0.05, ends: ['rarely', 'often'] },
+  { key: 'tackling', min: 0, max: 1, step: 0.05, ends: ['soft', 'hard'] },
 ];
 
 /** Tactic controls, reused on the setup screen and in the live "Tactics" tab. */
 export function tacticsControls(tac: Tactics, onChange: (t: Tactics) => void): HTMLElement {
   const root = document.createElement('div');
-  root.style.display = 'grid';
-  root.style.gap = '12px';
+  root.className = 'tactics-grid';
   const f = document.createElement('div');
   f.className = 'slider';
   f.innerHTML = `<label>${t('formation')}</label><select>${FORMATION_IDS.map((id) => `<option ${id === tac.formation ? 'selected' : ''}>${id}</option>`).join('')}</select>`;
@@ -72,8 +75,8 @@ export function renderSetup(container: HTMLElement, initial: Partial<MatchSetup>
   const state = {
     home: initial.home ?? CLUBS[0],
     away: initial.away ?? CLUBS[1],
-    homeTactics: { ...(initial.homeTactics ?? (initial.home ?? CLUBS[0]).tactics) },
-    awayTactics: { ...(initial.awayTactics ?? (initial.away ?? CLUBS[1]).tactics) },
+    homeTactics: withDefaults(initial.homeTactics ?? (initial.home ?? CLUBS[0]).tactics),
+    awayTactics: withDefaults(initial.awayTactics ?? (initial.away ?? CLUBS[1]).tactics),
     seed: initial.seed ?? Math.floor(Math.random() * 1e6),
   };
 
@@ -107,8 +110,8 @@ export function renderSetup(container: HTMLElement, initial: Partial<MatchSetup>
     card.querySelector('select')!.addEventListener('change', (e) => {
       const c = clubById((e.target as HTMLSelectElement).value);
       state[side] = c;
-      if (side === 'home') state.homeTactics = { ...c.tactics };
-      else state.awayTactics = { ...c.tactics };
+      if (side === 'home') state.homeTactics = withDefaults(c.tactics);
+      else state.awayTactics = withDefaults(c.tactics);
       renderCard(side);
     });
     card.appendChild(

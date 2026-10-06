@@ -93,7 +93,7 @@ export function generateOptions(match: Match, p: Player, restart: KickContext): 
       const pl = loftedPassSuccess(p, r, tgt, flight);
       const isCross = inBoxLocal(tl) && Math.abs(me.y - MID_Y) > 12 && me.x > 70;
       // Wide teams love a cross; a blocked or cleared cross often still earns a corner.
-      const crossBonus = isCross ? 0.008 + t.width * 0.018 : 0;
+      const crossBonus = isCross ? (0.008 + t.width * 0.018) * t.crossing * 2 : 0;
       const header = isCross ? 0.55 : 0.8; // aerial balls are harder to use
       addPass({
         kind: isCross ? 'cross' : 'lofted', target: tgt, receiver: r, success: pl, flightTime: flight,
@@ -112,9 +112,12 @@ export function generateOptions(match: Match, p: Player, restart: KickContext): 
     const goal = toWorld({ x: PITCH.length, y: MID_Y }, dir);
     // Edge-of-the-box shooters: with a clear sight of goal, good strikers let fly.
     const distToGoal = Math.hypot(PITCH.length - me.x, MID_Y - me.y);
-    const longShot = restart === null && distToGoal > 16 && distToGoal < 28 && nearestOpponentDistance(p) > 2
-      ? 0.008 + (p.a.shooting - 50) / 2500 : 0;
-    opts.push({ kind: 'shot', target: goal, receiver: null, success: xg, xg, utility: xg * bias - (1 - xg) * 0.012 + longShot });
+    // Shooting range instruction: 0.5 is neutral; higher = shoot on sight, lower = work it into the box.
+    const range = t.shootingRange;
+    const longShot = restart === null && distToGoal > 16 && distToGoal < 22 + range * 12 && nearestOpponentDistance(p) > 2
+      ? (0.008 + (p.a.shooting - 50) / 2500) * range * 2 : 0;
+    const discipline = restart === null && distToGoal > 16.5 && range < 0.5 ? (0.5 - range) * 0.04 : 0;
+    opts.push({ kind: 'shot', target: goal, receiver: null, success: xg, xg, utility: xg * bias - (1 - xg) * 0.012 + longShot - discipline });
   }
 
   if (restart === null) {

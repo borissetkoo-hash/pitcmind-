@@ -29,6 +29,10 @@ export class PitchRenderer {
   private trail: { x: number; y: number; z: number }[] = [];
   private kits: [Kit, Kit] | null = null;
   private kitsFor: Match | null = null;
+  /** Portrait pitch (goals top and bottom) with the home side attacking upwards. */
+  private vertical = true;
+  /** Set after half-time in portrait mode so the home side keeps attacking upwards. */
+  private flip = false;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -44,47 +48,81 @@ export class PitchRenderer {
     this.canvas.width = Math.round(rect.width * dpr);
     this.canvas.height = Math.round(rect.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const sx = this.w / (PITCH.length + MARGIN * 2);
-    const sy = this.h / (PITCH.width + MARGIN * 2);
-    this.scale = Math.min(sx, sy);
-    this.ox = (this.w - PITCH.length * this.scale) / 2;
-    this.oy = (this.h - PITCH.width * this.scale) / 2;
+    const vw = this.vertical ? PITCH.width : PITCH.length;
+    const vh = this.vertical ? PITCH.length : PITCH.width;
+    this.scale = Math.min(this.w / (vw + MARGIN * 2), this.h / (vh + MARGIN * 2));
+    this.ox = (this.w - vw * this.scale) / 2;
+    this.oy = (this.h - vh * this.scale) / 2;
     this.pitchCache = null;
   }
 
-  /** World metres → canvas pixels. */
-  px(x: number): number {
-    return this.ox + x * this.scale;
+  setVertical(v: boolean): void {
+    this.vertical = v;
+    this.trail.length = 0;
+    this.resize();
   }
-  py(y: number): number {
-    return this.oy + y * this.scale;
+
+  get isVertical(): boolean {
+    return this.vertical;
+  }
+
+  /** World metres → canvas pixels (handles the portrait rotation). */
+  sx(x: number, y: number): number {
+    const vx = !this.vertical ? x : this.flip ? PITCH.width - y : y;
+    return this.ox + vx * this.scale;
+  }
+  sy(x: number, y: number): number {
+    const vy = !this.vertical ? y : this.flip ? x : PITCH.length - x;
+    return this.oy + vy * this.scale;
+  }
+
+  /** World heading → screen heading. */
+  private angle(f: number): number {
+    return !this.vertical ? f : this.flip ? f + Math.PI / 2 : f - Math.PI / 2;
   }
 
   /** Canvas pixels → world metres (for hover tooltips). */
   toWorld(cx: number, cy: number): { x: number; y: number } {
-    return { x: (cx - this.ox) / this.scale, y: (cy - this.oy) / this.scale };
+    const vx = (cx - this.ox) / this.scale;
+    const vy = (cy - this.oy) / this.scale;
+    if (!this.vertical) return { x: vx, y: vy };
+    return this.flip ? { x: vy, y: PITCH.width - vx } : { x: PITCH.length - vy, y: vx };
   }
 
   private drawPitch(): void {
     if (!this.pitchCache) {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // The pitch is always painted landscape, then rotated for portrait mode.
+      const cw = this.vertical ? this.h : this.w;
+      const ch = this.vertical ? this.w : this.h;
       const c = document.createElement('canvas');
-      c.width = Math.round(this.w * dpr);
-      c.height = Math.round(this.h * dpr);
+      c.width = Math.round(cw * dpr);
+      c.height = Math.round(ch * dpr);
       const g = c.getContext('2d')!;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.paintPitch(g);
+      this.paintPitch(g, cw, ch);
       this.pitchCache = c;
     }
-    this.ctx.drawImage(this.pitchCache, 0, 0, this.w, this.h);
+    if (!this.vertical) {
+      this.ctx.drawImage(this.pitchCache, 0, 0, this.w, this.h);
+      return;
+    }
+    const g = this.ctx;
+    g.save();
+    g.translate(this.w / 2, this.h / 2);
+    g.rotate(this.flip ? Math.PI / 2 : -Math.PI / 2);
+    g.drawImage(this.pitchCache, -this.h / 2, -this.w / 2, this.h, this.w);
+    g.restore();
   }
 
-  private paintPitch(g: CanvasRenderingContext2D): void {
+  private paintPitch(g: CanvasRenderingContext2D, cw: number, ch: number): void {
     const s = this.scale;
-    const X = (x: number) => this.px(x);
-    const Y = (y: number) => this.py(y);
+    const hox = (cw - PITCH.length * s) / 2;
+    const hoy = (ch - PITCH.width * s) / 2;
+    const X = (x: number) => hox + x * s;
+    const Y = (y: number) => hoy + y * s;
     g.fillStyle = '#1f6b35';
-    g.fillRect(0, 0, this.w, this.h);
+    g.fillRect(0, 0, cw, ch);
     // Mowing stripes.
     const stripes = 14;
     for (let i = 0; i < stripes; i++) {
@@ -92,11 +130,11 @@ export class PitchRenderer {
       g.fillRect(X((PITCH.length / stripes) * i), Y(0), (PITCH.length / stripes) * s + 0.5, PITCH.width * s);
     }
     // Vignette.
-    const grad = g.createRadialGradient(this.w / 2, this.h / 2, this.h * 0.2, this.w / 2, this.h / 2, this.w * 0.75);
+    const grad = g.createRadialGradient(cw / 2, ch / 2, ch * 0.2, cw / 2, ch / 2, cw * 0.75);
     grad.addColorStop(0, 'rgba(0,0,0,0)');
     grad.addColorStop(1, 'rgba(0,0,0,0.28)');
     g.fillStyle = grad;
-    g.fillRect(0, 0, this.w, this.h);
+    g.fillRect(0, 0, cw, ch);
 
     g.strokeStyle = 'rgba(255,255,255,0.85)';
     g.lineWidth = Math.max(1, s * 0.12);
@@ -183,6 +221,11 @@ export class PitchRenderer {
     const g = this.ctx;
     const s = this.scale;
     g.clearRect(0, 0, this.w, this.h);
+    const flip = this.vertical && match.teams[0].dir === -1;
+    if (flip !== this.flip) {
+      this.flip = flip;
+      this.trail.length = 0;
+    }
     this.drawPitch();
 
     if (opts.aiVision && match.phase === 'play') this.drawAIVision(match);
@@ -199,8 +242,8 @@ export class PitchRenderer {
         g.strokeStyle = `rgba(255,255,255,${(i / this.trail.length) * 0.35})`;
         g.lineWidth = s * 0.25 * (i / this.trail.length);
         g.beginPath();
-        g.moveTo(this.px(a.x), this.py(a.y - a.z * 0.35));
-        g.lineTo(this.px(b.x), this.py(b.y - b.z * 0.35));
+        g.moveTo(this.sx(a.x, a.y), this.sy(a.x, a.y) - a.z * 0.35 * s);
+        g.lineTo(this.sx(b.x, b.y), this.sy(b.x, b.y) - b.z * 0.35 * s);
         g.stroke();
       }
     } else this.trail.length = 0;
@@ -215,7 +258,7 @@ export class PitchRenderer {
     g.fillStyle = 'rgba(0,0,0,0.25)';
     for (const p of frame.players) {
       g.beginPath();
-      g.ellipse(this.px(p.x) + r * 0.25, this.py(p.y) + r * 0.35, r, r * 0.6, 0, 0, Math.PI * 2);
+      g.ellipse(this.sx(p.x, p.y) + r * 0.25, this.sy(p.x, p.y) + r * 0.35, r, r * 0.6, 0, 0, Math.PI * 2);
       g.fill();
     }
     for (const p of frame.players) {
@@ -223,8 +266,9 @@ export class PitchRenderer {
       const fill = p.gk ? kit.gkFill : kit.fill;
       const stroke = p.gk ? kit.gkText : kit.stroke;
       const text = p.gk ? kit.gkText : kit.text;
-      const x = this.px(p.x);
-      const y = this.py(p.y);
+      const x = this.sx(p.x, p.y);
+      const y = this.sy(p.x, p.y);
+      const f = this.angle(p.f);
       if (p.owner) {
         g.beginPath();
         g.arc(x, y, r * 1.6, 0, Math.PI * 2);
@@ -241,9 +285,9 @@ export class PitchRenderer {
       }
       // Facing wedge.
       g.beginPath();
-      g.moveTo(x + Math.cos(p.f) * r * 1.45, y + Math.sin(p.f) * r * 1.45);
-      g.lineTo(x + Math.cos(p.f + 0.55) * r * 0.9, y + Math.sin(p.f + 0.55) * r * 0.9);
-      g.lineTo(x + Math.cos(p.f - 0.55) * r * 0.9, y + Math.sin(p.f - 0.55) * r * 0.9);
+      g.moveTo(x + Math.cos(f) * r * 1.45, y + Math.sin(f) * r * 1.45);
+      g.lineTo(x + Math.cos(f + 0.55) * r * 0.9, y + Math.sin(f + 0.55) * r * 0.9);
+      g.lineTo(x + Math.cos(f - 0.55) * r * 0.9, y + Math.sin(f - 0.55) * r * 0.9);
       g.closePath();
       g.fillStyle = stroke;
       g.fill();
@@ -271,9 +315,9 @@ export class PitchRenderer {
         if (!pl) continue;
         const last = pl.data.name.split(' ').slice(-1)[0];
         g.fillStyle = 'rgba(0,0,0,0.55)';
-        g.fillText(last, this.px(p.x) + 1, this.py(p.y) + r * 1.3 + 1);
+        g.fillText(last, this.sx(p.x, p.y) + 1, this.sy(p.x, p.y) + r * 1.3 + 1);
         g.fillStyle = '#fff';
-        g.fillText(last, this.px(p.x), this.py(p.y) + r * 1.3);
+        g.fillText(last, this.sx(p.x, p.y), this.sy(p.x, p.y) + r * 1.3);
       }
     }
 
@@ -282,10 +326,10 @@ export class PitchRenderer {
     const br = Math.max(3, s * 0.42) * (1 + b.z * 0.09);
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.beginPath();
-    g.ellipse(this.px(b.x) + b.z * s * 0.15, this.py(b.y) + b.z * s * 0.1, br * 0.9, br * 0.55, 0, 0, Math.PI * 2);
+    g.ellipse(this.sx(b.x, b.y) + b.z * s * 0.15, this.sy(b.x, b.y) + b.z * s * 0.1, br * 0.9, br * 0.55, 0, 0, Math.PI * 2);
     g.fill();
-    const bx = this.px(b.x);
-    const by = this.py(b.y - b.z * 0.35);
+    const bx = this.sx(b.x, b.y);
+    const by = this.sy(b.x, b.y) - b.z * 0.35 * s;
     const bg = g.createRadialGradient(bx - br * 0.3, by - br * 0.3, br * 0.1, bx, by, br);
     bg.addColorStop(0, '#ffffff');
     bg.addColorStop(1, '#cbd5e1');
@@ -311,8 +355,8 @@ export class PitchRenderer {
       g.globalAlpha = 0.8;
       g.lineWidth = 2;
       g.beginPath();
-      g.moveTo(this.px(wx), this.py(0));
-      g.lineTo(this.px(wx), this.py(PITCH.width));
+      g.moveTo(this.sx(wx, 0), this.sy(wx, 0));
+      g.lineTo(this.sx(wx, PITCH.width), this.sy(wx, PITCH.width));
       g.stroke();
       g.setLineDash([]);
       g.globalAlpha = 1;
@@ -322,11 +366,11 @@ export class PitchRenderer {
       g.strokeStyle = 'rgba(255,255,255,0.18)';
       g.lineWidth = 1;
       g.beginPath();
-      g.moveTo(this.px(p.pos.x), this.py(p.pos.y));
-      g.lineTo(this.px(p.target.x), this.py(p.target.y));
+      g.moveTo(this.sx(p.pos.x, p.pos.y), this.sy(p.pos.x, p.pos.y));
+      g.lineTo(this.sx(p.target.x, p.target.y), this.sy(p.target.x, p.target.y));
       g.stroke();
       g.fillStyle = 'rgba(255,255,255,0.3)';
-      g.fillRect(this.px(p.target.x) - 2, this.py(p.target.y) - 2, 4, 4);
+      g.fillRect(this.sx(p.target.x, p.target.y) - 2, this.sy(p.target.x, p.target.y) - 2, 4, 4);
     }
     // Ball carrier's evaluated options, coloured by utility.
     const dbg = match.debug;
@@ -341,15 +385,15 @@ export class PitchRenderer {
         g.lineWidth = 1 + q * 3;
         if (o.kind === 'lofted' || o.kind === 'cross') g.setLineDash([4, 4]);
         g.beginPath();
-        g.moveTo(this.px(dbg.carrier.pos.x), this.py(dbg.carrier.pos.y));
-        g.lineTo(this.px(o.target.x), this.py(o.target.y));
+        g.moveTo(this.sx(dbg.carrier.pos.x, dbg.carrier.pos.y), this.sy(dbg.carrier.pos.x, dbg.carrier.pos.y));
+        g.lineTo(this.sx(o.target.x, o.target.y), this.sy(o.target.x, o.target.y));
         g.stroke();
         g.setLineDash([]);
         if (q > 0.6) {
           g.fillStyle = `hsla(${hue}, 85%, 60%, 1)`;
           g.font = `600 ${Math.max(9, Math.round(s * 0.8))}px Inter, system-ui, sans-serif`;
           g.textAlign = 'left';
-          g.fillText(`${o.kind} ${(o.success * 100).toFixed(0)}%`, this.px(o.target.x) + 6, this.py(o.target.y) - 6);
+          g.fillText(`${o.kind} ${(o.success * 100).toFixed(0)}%`, this.sx(o.target.x, o.target.y) + 6, this.sy(o.target.x, o.target.y) - 6);
         }
       });
     }

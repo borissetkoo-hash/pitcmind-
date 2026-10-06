@@ -3,6 +3,8 @@ import { clubById } from './data/clubs';
 import { type Lang, getLang, setLang, t } from './i18n';
 import type { Fixture } from './league/league';
 import { renderAbout } from './ui/about';
+import { bootScreen } from './ui/boot';
+import { renderMenu } from './ui/menu';
 import { loadSeason, renderLeague, saveSeason } from './ui/leagueView';
 import { MatchView } from './ui/matchView';
 import { type MatchSetup, renderSetup } from './ui/setup';
@@ -23,6 +25,7 @@ function teardown(): void {
 
 function drawNav(route: string): void {
   const items: [string, string][] = [
+    ['#/menu', t('navMenu')],
     ['#/match', t('navMatch')],
     ['#/league', t('navLeague')],
     ['#/about', t('navAbout')],
@@ -54,7 +57,7 @@ function startMatch(setup: MatchSetup, instant: boolean, fixture?: Fixture): voi
 }
 
 function route(): void {
-  const r = location.hash.replace(/^#/, '') || '/match';
+  const r = location.hash.replace(/^#/, '') || '/menu';
   drawNav(r);
   if (r.startsWith('/match/live') && current) return;
   teardown();
@@ -68,11 +71,13 @@ function route(): void {
     });
   } else if (r.startsWith('/about')) {
     renderAbout(view);
-  } else {
+  } else if (r.startsWith('/match')) {
     renderSetup(view, lastSetup, (s, instant) => {
       history.pushState(null, '', '#/match/live');
       startMatch(s, instant);
     });
+  } else {
+    renderMenu(view, season, route);
   }
   window.scrollTo(0, 0);
 }
@@ -84,4 +89,6 @@ langBtn.addEventListener('click', () => {
   else route();
 });
 window.addEventListener('hashchange', route);
+// Loading screen first; the menu renders underneath so it is ready when the splash fades.
 route();
+void bootScreen();

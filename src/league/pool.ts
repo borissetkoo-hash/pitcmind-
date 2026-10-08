@@ -2,6 +2,13 @@ import type { FixtureResult } from './league';
 import { playFixture } from './simulate';
 import type { SimRequest } from './worker';
 
+let shared: SimPool | null = null;
+/** One pool for the whole app (league and career share the workers). */
+export function sharedPool(): SimPool {
+  shared ??= new SimPool();
+  return shared;
+}
+
 /** A small pool of Web Workers so a whole round simulates in parallel off the main thread. */
 export class SimPool {
   private workers: Worker[] = [];
@@ -27,7 +34,7 @@ export class SimPool {
 
   run(req: SimRequest): Promise<FixtureResult> {
     if (!this.workers.length) {
-      return new Promise((resolve) => setTimeout(() => resolve(playFixture(req.home, req.away, req.seed)), 0));
+      return new Promise((resolve) => setTimeout(() => resolve(playFixture(req.home, req.away, req.seed, true, req.overrides)), 0));
     }
     return new Promise((resolve) => {
       this.queue.push({ req, resolve });

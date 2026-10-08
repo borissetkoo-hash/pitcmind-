@@ -5,6 +5,7 @@ import type { Fixture } from './league/league';
 import { coachById } from './data/coaches';
 import { renderAbout } from './ui/about';
 import { installTooltips } from './ui/charts';
+import { renderCareer } from './ui/careerView';
 import { renderCoaches } from './ui/coachUi';
 import { bootScreen } from './ui/boot';
 import { renderMenu } from './ui/menu';
@@ -29,6 +30,7 @@ function teardown(): void {
 function drawNav(route: string): void {
   const items: [string, string][] = [
     ['#/menu', t('navMenu')],
+    ['#/career', t('menuCareer')],
     ['#/match', t('navMatch')],
     ['#/league', t('navLeague')],
     ['#/coaches', t('coaches')],
@@ -78,6 +80,22 @@ function route(): void {
     });
   } else if (r.startsWith('/about')) {
     renderAbout(view);
+  } else if (r.startsWith('/career')) {
+    renderCareer(view, {
+      playLive: (setup, focusTeam, onFinish) => {
+        history.pushState(null, '', '#/match/live');
+        drawNav('/career');
+        teardown();
+        current = new MatchView(view, setup, {
+          focusTeam,
+          nextLabel: t('toCareer'),
+          onFinish,
+          onNewMatch: () => {
+            location.hash = '#/career';
+          },
+        });
+      },
+    });
   } else if (r.startsWith('/coaches')) {
     renderCoaches(view);
     installTooltips(view);

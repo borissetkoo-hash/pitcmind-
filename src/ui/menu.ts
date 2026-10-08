@@ -1,3 +1,6 @@
+import { avatarSvg } from '../career/avatar';
+import { seasonLabel } from '../career/career';
+import { peekCareer } from '../career/storage';
 import { CLUBS, clubById } from '../data/clubs';
 import { computeTable, nextRound, type SeasonState } from '../league/league';
 import { type Lang, getLang, setLang, t } from '../i18n';
@@ -13,12 +16,14 @@ export function renderMenu(root: HTMLElement, season: SeasonState, onLangChange:
   const next = round ? season.fixtures.filter((f) => f.round === round && !f.result)[0] : null;
   const leader = played ? clubById(table[0].club) : null;
   const s = getSettings();
+  const career = peekCareer();
 
   root.innerHTML = `
     <div class="menu">
       <nav class="menu-list" aria-label="Main menu">
         <div class="menu-title"><span class="brand-mark">◉</span> PitchMind</div>
-        <a class="menu-item primary" href="#/match"><b>⚽ ${t('menuQuick')}</b><span>${t('menuQuickSub')}</span></a>
+        <a class="menu-item primary career-tile" href="#/career">${career ? `<span class="tile-portrait">${avatarSvg(career.coach.look, 52)}</span>` : ''}<b>👔 ${career ? t('menuCareerCont') : t('menuCareer')}</b><span>${career ? `${esc(career.coach.firstName)} ${esc(career.coach.lastName)} · ${esc(clubById(career.clubId).name)} · ${seasonLabel(career.season)}` : t('menuCareerSub')}</span></a>
+        <a class="menu-item" href="#/match"><b>⚽ ${t('menuQuick')}</b><span>${t('menuQuickSub')}</span></a>
         <a class="menu-item" href="#/league"><b>🏆 ${played ? t('menuContinue') : t('menuSeason')}</b><span>${t('menuSeasonSub')}</span></a>
         <a class="menu-item" href="#/coaches"><b>👔 ${t('menuCoaches')}</b><span>${t('menuCoachesSub')}</span></a>
         <a class="menu-item" href="#/about"><b>🧠 ${t('navAbout')}</b><span>${t('menuAboutSub')}</span></a>

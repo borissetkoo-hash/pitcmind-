@@ -6,7 +6,7 @@ import { SERIES, heatMap, installTooltips, shotMap, statRows, xgTimeline } from 
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-export function renderReport(root: HTMLElement, m: Match, opts: { onNewMatch?: () => void } = {}): void {
+export function renderReport(root: HTMLElement, m: Match, opts: { onNewMatch?: () => void; nextLabel?: string } = {}): void {
   computeRatings(m);
   const [home, away] = m.teams;
   const names: [string, string] = [home.club.name, away.club.name];
@@ -49,7 +49,7 @@ export function renderReport(root: HTMLElement, m: Match, opts: { onNewMatch?: (
         <div class="scorers"><div style="text-align:right">${scorers(0) || '—'}</div><div>${scorers(1) || '—'}</div></div>
         ${motm ? `<div class="motm">⭐ ${t('motm')}: <b>${esc(motm.data.name)}</b> (${esc(motm.team.club.short)}) <span class="rating hi">${motm.stats.rating.toFixed(1)}</span></div>` : ''}
         <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-          ${opts.onNewMatch ? `<button class="btn primary" id="newMatch" type="button">${t('newMatch')}</button>` : ''}
+          ${opts.onNewMatch ? `<button class="btn primary" id="newMatch" type="button">${opts.nextLabel ?? t('newMatch')}</button>` : ''}
         </div>
       </div>
       <div class="panel"><div class="card-title"><h3>${t('stats')}</h3></div>${statRows([

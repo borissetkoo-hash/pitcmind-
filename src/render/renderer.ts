@@ -33,6 +33,8 @@ export class PitchRenderer {
   private vertical = true;
   /** Set after half-time in portrait mode so the home side keeps attacking upwards. */
   private flip = false;
+  /** In portrait mode this team always attacks upwards (the user's side in career mode). */
+  focusTeam: 0 | 1 = 0;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -221,7 +223,7 @@ export class PitchRenderer {
     const g = this.ctx;
     const s = this.scale;
     g.clearRect(0, 0, this.w, this.h);
-    const flip = this.vertical && match.teams[0].dir === -1;
+    const flip = this.vertical && match.teams[this.focusTeam].dir === -1;
     if (flip !== this.flip) {
       this.flip = flip;
       this.trail.length = 0;

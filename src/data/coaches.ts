@@ -1,8 +1,9 @@
+import type { AvatarLook } from '../career/avatar';
 import type { CoachTraits, FormationId, Tactics } from '../engine/types';
 
 export type { CoachTraits };
 
-export type CoachGroup = 'legends' | 'epl';
+export type CoachGroup = 'legends' | 'epl' | 'custom';
 
 export interface Coach {
   id: string;
@@ -15,6 +16,8 @@ export interface Coach {
   tactics: Omit<Tactics, 'formation'>;
   traits: CoachTraits;
   style: { ru: string; en: string };
+  /** Drawn portrait for coaches created in career mode (real coaches use initials). */
+  look?: AvatarLook;
 }
 
 type Row = [

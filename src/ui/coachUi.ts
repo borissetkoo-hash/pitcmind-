@@ -1,3 +1,4 @@
+import { avatarSvg } from '../career/avatar';
 import { COACHES, type Coach, TRAIT_KEYS, coachById } from '../data/coaches';
 import { getLang, type Key, t } from '../i18n';
 
@@ -7,6 +8,7 @@ export const coachName = (c: Coach) => (getLang() === 'ru' ? c.nameRu : c.name);
 
 /** Initials avatar with the coach's flag — no photos (likeness rights). */
 export function coachAvatar(c: Coach, size = 44): string {
+  if (c.look) return `<span class="coach-avatar portrait" style="width:${size}px;height:${size}px">${avatarSvg(c.look, size)}<i>${c.flag}</i></span>`;
   const initials = c.name
     .split(/\s+/)
     .filter((w) => /^[A-ZÀ-Ž]/.test(w))

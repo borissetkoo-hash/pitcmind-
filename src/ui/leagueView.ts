@@ -1,6 +1,6 @@
 import { CLUBS, clubById } from '../data/clubs';
 import { type Fixture, type SeasonState, computeTable, newSeason, nextRound, topScorers } from '../league/league';
-import { SimPool } from '../league/pool';
+import { type SimPool, sharedPool } from '../league/pool';
 import { t } from '../i18n';
 
 const KEY = 'pm-season-v1';
@@ -30,7 +30,7 @@ export function saveSeason(s: SeasonState): void {
 let pool: SimPool | null = null;
 
 export function renderLeague(root: HTMLElement, season: SeasonState, onWatch: (f: Fixture) => void): void {
-  pool ??= new SimPool();
+  pool ??= sharedPool();
   const totalRounds = Math.max(...season.fixtures.map((f) => f.round));
   let viewRound = nextRound(season) ?? totalRounds;
   let busy = false;

@@ -20,6 +20,10 @@ export interface MatchViewOptions {
   /** Called once with the finished match (used by league mode to record the result). */
   onFinish?: (m: Match) => void;
   onNewMatch?: () => void;
+  /** Label for the report's primary button (defaults to "New match"). */
+  nextLabel?: string;
+  /** Keep this team attacking upwards in portrait mode. */
+  focusTeam?: 0 | 1;
 }
 
 /** Interactive live match: canvas pitch, broadcast scoreboard and analysis side panel. */
@@ -132,6 +136,7 @@ export class MatchView {
     }
     const canvas = q<HTMLCanvasElement>('#pitch');
     this.renderer = new PitchRenderer(canvas);
+    this.renderer.focusTeam = this.options.focusTeam ?? 0;
     this.renderer.setVertical(portrait);
     window.addEventListener('resize', this.onResize);
     window.addEventListener('keydown', this.onKey);
@@ -441,6 +446,7 @@ export class MatchView {
     this.options.onFinish?.(this.match);
     renderReport(this.el.report, this.match, {
       onNewMatch: this.options.onNewMatch,
+      nextLabel: this.options.nextLabel,
     });
     this.el.report.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

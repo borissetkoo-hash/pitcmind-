@@ -1,4 +1,4 @@
-import { avatarSvg } from '../career/avatar';
+import { portraitHtml } from '../career/avatar';
 import { seasonLabel } from '../career/career';
 import { peekCareer } from '../career/storage';
 import { CLUBS, clubById } from '../data/clubs';
@@ -22,7 +22,7 @@ export function renderMenu(root: HTMLElement, season: SeasonState, onLangChange:
     <div class="menu">
       <nav class="menu-list" aria-label="Main menu">
         <div class="menu-title"><span class="brand-mark">◉</span> PitchMind</div>
-        <a class="menu-item primary career-tile" href="#/career">${career ? `<span class="tile-portrait">${avatarSvg(career.coach.look, 52)}</span>` : ''}<b>👔 ${career ? t('menuCareerCont') : t('menuCareer')}</b><span>${career ? `${esc(career.coach.firstName)} ${esc(career.coach.lastName)} · ${esc(clubById(career.clubId).name)} · ${seasonLabel(career.season)}` : t('menuCareerSub')}</span></a>
+        <a class="menu-item primary career-tile" href="#/career">${career ? `<span class="tile-portrait">${portraitHtml(career.coach.look, 52)}</span>` : ''}<b>👔 ${career ? t('menuCareerCont') : t('menuCareer')}</b><span>${career ? `${esc(career.coach.firstName)} ${esc(career.coach.lastName)} · ${esc(clubById(career.clubId).name)} · ${seasonLabel(career.season)}` : t('menuCareerSub')}</span></a>
         <a class="menu-item" href="#/match"><b>⚽ ${t('menuQuick')}</b><span>${t('menuQuickSub')}</span></a>
         <a class="menu-item" href="#/league"><b>🏆 ${played ? t('menuContinue') : t('menuSeason')}</b><span>${t('menuSeasonSub')}</span></a>
         <a class="menu-item" href="#/coaches"><b>👔 ${t('menuCoaches')}</b><span>${t('menuCoachesSub')}</span></a>

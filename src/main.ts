@@ -2,6 +2,7 @@ import './styles.css';
 import { clubById } from './data/clubs';
 import { type Lang, getLang, setLang, t } from './i18n';
 import type { Fixture } from './league/league';
+import { loadFaces } from './career/faces';
 import { coachById } from './data/coaches';
 import { renderAbout } from './ui/about';
 import { installTooltips } from './ui/charts';
@@ -117,6 +118,7 @@ langBtn.addEventListener('click', () => {
   else route();
 });
 window.addEventListener('hashchange', route);
-// Loading screen first; the menu renders underneath so it is ready when the splash fades.
-route();
+// Loading screen first; the first view renders underneath once imported faces are in memory
+// (capped, so a slow or blocked IndexedDB never holds the game back).
 void bootScreen();
+void Promise.race([loadFaces(), new Promise((r) => setTimeout(r, 500))]).then(() => route());

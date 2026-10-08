@@ -1,4 +1,5 @@
-import { DEFAULT_LOOK, LOOK_COUNTS, LOOK_KEYS, LOOK_LABELS, type LookKey, avatarSvg, randomLook } from '../career/avatar';
+import { DEFAULT_LOOK, LOOK_COUNTS, LOOK_KEYS, LOOK_LABELS, type LookKey, portraitHtml, randomLook } from '../career/avatar';
+import { MAX_FACES, deleteFace, importFaces, listFaces, loadFaces } from '../career/faces';
 import {
   type CareerCoach,
   type CareerState,
@@ -40,6 +41,10 @@ const L = {
     firstName: 'Имя', lastName: 'Фамилия', nationality: 'Гражданство', appearance: 'Внешность', randomLook: 'Случайная внешность',
     philosophy: 'Футбольная философия', next: 'Далее: выбор клуба', back: 'Назад', chooseClub: 'Выберите клуб', chooseClubSub: 'От клуба зависят задачи правления и уровень игроков.',
     replaces: 'Сейчас тренирует', target: 'Задача', startCareer: 'Начать карьеру', nameRequired: 'Введите имя и фамилию тренера.',
+    drawn: 'Рисованный', photo: 'Фото из файлов', addFaces: 'Добавить лица',
+    facesNote: 'Лица хранятся только в этом браузере: они никуда не загружаются и не попадают в облачное сохранение.',
+    noFaces: 'Пока нет лиц. Добавьте картинки из своей папки faces (PNG, JPG, WebP) — например, из пака лиц для Football Manager.',
+    imported: (a: number, sk: number) => `Добавлено: ${a}${sk ? `, пропущено: ${sk}` : ''}.`, removeFace: 'Удалить лицо',
     skin: 'Тон кожи', hair: 'Причёска', hairColor: 'Цвет волос', beard: 'Борода', glasses: 'Очки', outfit: 'Одежда',
     season: 'Сезон', round: 'Тур', nextMatch: 'Следующий матч', home: 'Дома', away: 'В гостях', vs: 'против', opponentCoach: 'Тренер соперника',
     tactics: 'Тактика', hideTactics: 'Скрыть тактику', playLive: 'Играть матч', quick: 'Быстрый результат', simulating: 'Симуляция тура…',
@@ -59,6 +64,10 @@ const L = {
     firstName: 'First name', lastName: 'Last name', nationality: 'Nationality', appearance: 'Appearance', randomLook: 'Random look',
     philosophy: 'Football philosophy', next: 'Next: choose a club', back: 'Back', chooseClub: 'Choose a club', chooseClubSub: 'The club sets the board’s expectations and the quality of your squad.',
     replaces: 'Current coach', target: 'Objective', startCareer: 'Start career', nameRequired: 'Enter the manager’s first and last name.',
+    drawn: 'Drawn', photo: 'Photo from files', addFaces: 'Add faces',
+    facesNote: 'Faces stay in this browser only: they are never uploaded and are not part of the cloud save.',
+    noFaces: 'No faces yet. Add images from your own faces folder (PNG, JPG, WebP) — for example a Football Manager face pack.',
+    imported: (a: number, sk: number) => `Added: ${a}${sk ? `, skipped: ${sk}` : ''}.`, removeFace: 'Remove face',
     skin: 'Skin tone', hair: 'Hair', hairColor: 'Hair colour', beard: 'Facial hair', glasses: 'Glasses', outfit: 'Outfit',
     season: 'Season', round: 'Round', nextMatch: 'Next match', home: 'Home', away: 'Away', vs: 'vs', opponentCoach: 'Opposition coach',
     tactics: 'Tactics', hideTactics: 'Hide tactics', playLive: 'Play match', quick: 'Quick result', simulating: 'Simulating the round…',
@@ -128,7 +137,7 @@ async function catchUp(state: CareerState, onProgress: () => void): Promise<void
 
 export function renderCareer(root: HTMLElement, deps: CareerDeps): void {
   root.innerHTML = `<p class="muted" style="padding:40px 0">${tr().loading}</p>`;
-  void loadCareer().then((state) => {
+  void Promise.all([loadCareer(), loadFaces()]).then(([state]) => {
     if (!root.isConnected) return;
     if (state) showCareer(root, state, deps);
     else renderCreator(root, deps);
@@ -157,13 +166,32 @@ function renderCreator(root: HTMLElement, deps: CareerDeps): void {
   };
   const l = tr();
   const lang = getLang();
+  let mode: 'drawn' | 'photo' = 'drawn';
+  let faceMsg = '';
+
+  const facePanel = () => {
+    const faces = listFaces();
+    return `<div class="face-tools"><label class="btn small primary" for="faceFiles">＋ ${l.addFaces}</label>
+        <input id="faceFiles" type="file" accept="image/*" multiple hidden>
+        <span class="muted" id="faceMsg" role="status">${esc(faceMsg || `${faces.length}/${MAX_FACES}`)}</span></div>
+      <p class="muted face-note">${l.facesNote}</p>
+      ${faces.length
+        ? `<div class="face-grid">${faces
+            .map(
+              (f) => `<div class="face-cell ${draft.look.photo === f.id ? 'on' : ''}">
+                <button type="button" class="face-pick" data-face="${esc(f.id)}" aria-pressed="${draft.look.photo === f.id}" title="${esc(f.name)}"><img src="${f.dataUrl}" alt="${esc(f.name)}" width="72" height="72"><span>${esc(f.name)}</span></button>
+                <button type="button" class="face-del" data-del="${esc(f.id)}" aria-label="${l.removeFace} ${esc(f.name)}">×</button></div>`,
+            )
+            .join('')}</div>`
+        : `<p class="face-empty">${l.noFaces}</p>`}`;
+  };
 
   const draw = () => {
     root.innerHTML = `
       <section class="hero"><div><h1>${l.createTitle}</h1><p>${l.createSub}</p></div></section>
       <div class="creator">
         <aside class="panel creator-preview">
-          <div class="creator-portrait" id="portrait">${avatarSvg(draft.look, 220)}</div>
+          <div class="creator-portrait" id="portrait">${portraitHtml(draft.look, 220)}</div>
           <div class="creator-name" id="previewName">${esc(`${draft.firstName} ${draft.lastName}`.trim() || '—')}</div>
           <div class="muted" id="previewMeta">${draft.flag} · ${lang === 'ru' ? STYLE_TEXT[draft.style].nameRu : STYLE_TEXT[draft.style].nameEn}</div>
           <button class="btn small" type="button" id="randomLook">🎲 ${l.randomLook}</button>
@@ -177,13 +205,17 @@ function renderCreator(root: HTMLElement, deps: CareerDeps): void {
             </div>
           </section>
           <section class="panel creator-section">
-            <h3>${l.appearance}</h3>
-            <div class="look-grid">${LOOK_KEYS.map(
+            <div class="card-title"><h3>${l.appearance}</h3>
+              <div class="seg" role="group" aria-label="${l.appearance}">
+                <button type="button" data-mode="drawn" aria-pressed="${mode === 'drawn'}">${l.drawn}</button>
+                <button type="button" data-mode="photo" aria-pressed="${mode === 'photo'}">${l.photo}</button>
+              </div></div>
+            ${mode === 'drawn' ? `<div class="look-grid">${LOOK_KEYS.map(
               (k) => `<div class="look-row"><span class="look-label">${l[k]}</span>
                 <button class="btn small arrow" type="button" data-look="${k}" data-step="-1" aria-label="${l[k]} −">◀</button>
                 <span class="look-value" id="lv-${k}">${LOOK_LABELS[k][lang][draft.look[k]]}</span>
                 <button class="btn small arrow" type="button" data-look="${k}" data-step="1" aria-label="${l[k]} +">▶</button></div>`,
-            ).join('')}</div>
+            ).join('')}</div>` : facePanel()}
           </section>
           <section class="panel creator-section">
             <h3>${l.philosophy}</h3>
@@ -199,11 +231,45 @@ function renderCreator(root: HTMLElement, deps: CareerDeps): void {
       </div>`;
 
     const refreshPreview = () => {
-      root.querySelector('#portrait')!.innerHTML = avatarSvg(draft.look, 220);
+      root.querySelector('#portrait')!.innerHTML = portraitHtml(draft.look, 220);
       root.querySelector('#previewName')!.textContent = `${draft.firstName} ${draft.lastName}`.trim() || '—';
       root.querySelector('#previewMeta')!.textContent = `${draft.flag} · ${lang === 'ru' ? STYLE_TEXT[draft.style].nameRu : STYLE_TEXT[draft.style].nameEn}`;
-      for (const k of LOOK_KEYS) root.querySelector(`#lv-${k}`)!.textContent = LOOK_LABELS[k][lang][draft.look[k]];
+      for (const k of LOOK_KEYS) {
+        const el = root.querySelector(`#lv-${k}`);
+        if (el) el.textContent = LOOK_LABELS[k][lang][draft.look[k]];
+      }
     };
+    root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((b) =>
+      b.addEventListener('click', () => {
+        mode = b.dataset.mode as typeof mode;
+        if (mode === 'drawn') draft.look.photo = undefined;
+        faceMsg = '';
+        draw();
+      }),
+    );
+    root.querySelector<HTMLInputElement>('#faceFiles')?.addEventListener('change', async (e) => {
+      const input = e.target as HTMLInputElement;
+      if (!input.files?.length) return;
+      const msg = root.querySelector('#faceMsg');
+      if (msg) msg.textContent = '…';
+      const r = await importFaces(input.files);
+      faceMsg = l.imported(r.added, r.skipped);
+      if (!draft.look.photo && listFaces()[0]) draft.look.photo = listFaces()[0].id;
+      draw();
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-face]').forEach((b) =>
+      b.addEventListener('click', () => {
+        draft.look.photo = b.dataset.face;
+        draw();
+      }),
+    );
+    root.querySelectorAll<HTMLButtonElement>('[data-del]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        if (draft.look.photo === b.dataset.del) draft.look.photo = undefined;
+        await deleteFace(b.dataset.del!);
+        draw();
+      }),
+    );
     root.querySelector<HTMLInputElement>('#firstName')!.addEventListener('input', (e) => {
       draft.firstName = (e.target as HTMLInputElement).value.trim();
       refreshPreview();
@@ -225,6 +291,12 @@ function renderCreator(root: HTMLElement, deps: CareerDeps): void {
       }),
     );
     root.querySelector('#randomLook')!.addEventListener('click', () => {
+      if (mode === 'photo') {
+        const faces = listFaces();
+        if (faces.length) draft.look.photo = faces[Math.floor(Math.random() * faces.length)].id;
+        draw();
+        return;
+      }
       draft.look = randomLook();
       refreshPreview();
     });
@@ -245,6 +317,7 @@ function renderCreator(root: HTMLElement, deps: CareerDeps): void {
     });
   };
   draw();
+  void loadFaces().then(() => root.isConnected && mode === 'photo' && draw());
 }
 
 function playerCoachPreview(c: CareerCoach) {
@@ -257,7 +330,7 @@ function renderClubPick(root: HTMLElement, coach: CareerCoach, deps: CareerDeps,
   const draw = () => {
     root.innerHTML = `
       <section class="hero"><div><h1>${l.chooseClub}</h1><p>${l.chooseClubSub}</p></div>
-        <div class="hero-coach">${avatarSvg(coach.look, 56)}<div><b>${esc(coach.firstName)} ${esc(coach.lastName)}</b><div class="muted">${coach.flag}</div></div></div></section>
+        <div class="hero-coach">${portraitHtml(coach.look, 56)}<div><b>${esc(coach.firstName)} ${esc(coach.lastName)}</b><div class="muted">${coach.flag}</div></div></div></section>
       <div class="club-grid">${CLUBS.map((c) => {
         const st = strength(c, c.tactics.formation);
         return `<button type="button" class="panel club-card ${c.id === chosen ? 'on' : ''}" data-club="${c.id}" aria-pressed="${c.id === chosen}">

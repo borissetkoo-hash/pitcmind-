@@ -391,3 +391,21 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 @media (max-width: 520px) {
   .look-row { grid-template-columns: 90px 34px minmax(0, 1fr) 34px; }
 }
+
+/* ── imported faces ── */
+.photo-portrait { display: inline-block; border-radius: 50%; overflow: hidden; flex: none; vertical-align: middle; }
+.photo-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
+.creator-portrait .photo-portrait { width: 220px !important; height: 220px !important; max-width: 100%; box-shadow: 0 0 0 3px var(--border), 0 18px 40px rgba(0,0,0,.35); }
+.tile-portrait .photo-portrait, .hero-coach .photo-portrait { box-shadow: 0 0 0 2px var(--border); }
+.face-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.face-note { margin: 0; font-size: 12.5px; }
+.face-empty { margin: 0; color: var(--text-2); font-size: 13.5px; background: var(--panel-2); border: 1px dashed var(--border); border-radius: 10px; padding: 14px; }
+.face-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; max-height: 300px; overflow-y: auto; padding: 2px; }
+.face-cell { position: relative; }
+.face-pick { width: 100%; display: grid; justify-items: center; gap: 4px; padding: 6px 4px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-2); cursor: pointer; color: var(--text-2); font: inherit; font-size: 11px; }
+.face-pick img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; object-position: center top; background: #1c2940; }
+.face-pick span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.face-cell.on .face-pick { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; color: var(--text); }
+.face-pick:focus-visible, .face-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.face-del { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel); color: var(--text-2); cursor: pointer; line-height: 1; font-size: 14px; opacity: .75; }
+.face-del:hover { opacity: 1; color: var(--danger); }

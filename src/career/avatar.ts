@@ -1,3 +1,5 @@
+import { getFace } from './faces';
+
 /**
  * Coach face builder, in the spirit of the old FIFA "create a manager" screen:
  * a handful of drawn assets per category, combined into one SVG portrait.
@@ -9,6 +11,8 @@ export interface AvatarLook {
   beard: number;
   glasses: number;
   outfit: number;
+  /** An imported face (see faces.ts). Local to this browser; the drawing is the fallback elsewhere. */
+  photo?: string;
 }
 
 export const SKIN_TONES = ['#f6d5bd', '#eab894', '#d49b6c', '#b47649', '#8c5632', '#5f3a22'];
@@ -43,7 +47,7 @@ export const LOOK_LABELS = {
   outfit: { ru: ['Костюм с галстуком', 'Костюм без галстука', 'Пальто', 'Клубный спортивный костюм', 'Водолазка', 'Тренировочная кофта'], en: ['Suit and tie', 'Open-collar suit', 'Overcoat', 'Club tracksuit', 'Turtleneck', 'Training top'] },
 } as const;
 
-export type LookKey = keyof AvatarLook;
+export type LookKey = Exclude<keyof AvatarLook, 'photo'>;
 export const LOOK_KEYS: LookKey[] = ['skin', 'hair', 'hairColor', 'beard', 'glasses', 'outfit'];
 export const LOOK_COUNTS: Record<LookKey, number> = {
   skin: SKIN_TONES.length,
@@ -123,6 +127,15 @@ function outfitPath(o: Outfit): string {
     default: // knit / turtleneck
       return `${body}<path fill="${shade(o.jacket, 1.25)}" d="M48 78h24v10c-4 3-8 4-12 4s-8-1-12-4z"/>`;
   }
+}
+
+/** The coach's portrait: an imported photo when this browser has it, otherwise the drawn face. */
+export function portraitHtml(look: AvatarLook, size = 96, background = '#1c2940'): string {
+  const face = getFace(look.photo);
+  if (face) {
+    return `<span class="photo-portrait" style="width:${size}px;height:${size}px;background:${background}"><img src="${face.dataUrl}" alt="" width="${size}" height="${size}"></span>`;
+  }
+  return avatarSvg(look, size, background);
 }
 
 /** Renders the coach portrait as an inline SVG string. */

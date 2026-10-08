@@ -1,4 +1,5 @@
 import { CLUBS } from '../data/clubs';
+import { loadFaces } from '../career/faces';
 import { Match } from '../engine/match';
 import { t } from '../i18n';
 
@@ -44,7 +45,7 @@ export async function bootScreen(): Promise<void> {
   };
 
   const steps: [string, number, number, () => unknown][] = [
-    [t('bootFonts'), 18, 450, () => document.fonts?.ready],
+    [t('bootFonts'), 18, 450, () => Promise.all([document.fonts?.ready, loadFaces()])],
     [t('bootClubs'), 42, 550, () => CLUBS.reduce((n, c) => n + c.players.length, 0)],
     [t('bootEngine'), 78, 700, () => {
       // Warm up the engine (JIT) with a few seconds of a throwaway match.

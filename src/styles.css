@@ -409,3 +409,27 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .face-pick:focus-visible, .face-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .face-del { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel); color: var(--text-2); cursor: pointer; line-height: 1; font-size: 14px; opacity: .75; }
 .face-del:hover { opacity: 1; color: var(--danger); }
+
+/* ── crests & club editor ── */
+.crest { display: inline-grid; place-items: center; flex: none; border-radius: 12px; border: 2px solid; font-weight: 800; letter-spacing: .02em; line-height: 1; }
+.table .crest, .fixture .crest { border-radius: 6px; border-width: 1.5px; }
+.crest.crest-logo { border: 0 !important; background: none !important; border-radius: 0; }
+.crest-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.menu-clubs .crest { border-radius: 10px; }
+.club-note { margin: -8px 0 16px; font-size: 13px; }
+.club-edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.club-edit { padding: 18px; display: grid; gap: 14px; align-content: start; }
+.ce-head { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.ce-name { font-size: 18px; }
+.ce-fields { display: grid; grid-template-columns: minmax(0, 1fr) 90px; gap: 10px; }
+.ce-fields .field:last-child { grid-column: 1 / -1; }
+.ce-colors { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.swatch { display: inline-flex; gap: 6px; align-items: center; color: var(--text-2); cursor: pointer; }
+.swatch input { width: 34px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
+.ce-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ce-actions .sep { flex: 1; }
+.club-edit .form-error:empty { display: none; }
+.club-edit .form-error { margin: 0; }
+.sb-team .crest { flex: none; }
+.field input, .field select { width: 100%; min-width: 0; }
+.crest-logo img { border-radius: 4px; }

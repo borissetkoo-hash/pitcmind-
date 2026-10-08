@@ -1,4 +1,5 @@
 import { toLocal } from '../engine/pitch';
+import { crestHtml } from '../data/clubCustom';
 import { Match, type MatchEvent } from '../engine/match';
 import type { Player } from '../engine/player';
 import { computeRatings } from '../engine/ratings';
@@ -76,9 +77,9 @@ export class MatchView {
     const portrait = getSettings().verticalPitch;
     const scoreboard = `
           <div class="panel scoreboard">
-            <div class="sb-team"><span class="sb-kit" style="background:${hk.fill};border-color:${hk.stroke}"></span><span class="name">${esc(home.name)}</span></div>
+            <div class="sb-team">${crestHtml(home, 34)}<span class="sb-kit" style="background:${hk.fill};border-color:${hk.stroke}"></span><span class="name">${esc(home.name)}</span></div>
             <div class="sb-center"><div class="sb-score num" id="score">0 : 0</div><div class="sb-clock" id="clock">0'</div><div class="sb-xg" id="xg">xG 0.00 – 0.00</div></div>
-            <div class="sb-team away"><span class="name">${esc(away.name)}</span><span class="sb-kit" style="background:${ak.fill};border-color:${ak.stroke}"></span></div>
+            <div class="sb-team away"><span class="name">${esc(away.name)}</span><span class="sb-kit" style="background:${ak.fill};border-color:${ak.stroke}"></span>${crestHtml(away, 34)}</div>
           </div>`;
     const pitch = `
           <div class="pitch-wrap ${portrait ? 'portrait' : ''}">

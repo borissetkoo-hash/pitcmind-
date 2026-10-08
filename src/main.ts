@@ -3,6 +3,8 @@ import { clubById } from './data/clubs';
 import { type Lang, getLang, setLang, t } from './i18n';
 import type { Fixture } from './league/league';
 import { loadFaces } from './career/faces';
+import { applyClubOverrides, loadLogos } from './data/clubCustom';
+import { renderClubs } from './ui/clubsView';
 import { coachById } from './data/coaches';
 import { renderAbout } from './ui/about';
 import { installTooltips } from './ui/charts';
@@ -35,6 +37,7 @@ function drawNav(route: string): void {
     ['#/match', t('navMatch')],
     ['#/league', t('navLeague')],
     ['#/coaches', t('coaches')],
+    ['#/clubs', t('clubEditor')],
     ['#/about', t('navAbout')],
   ];
   nav.innerHTML = items.map(([href, label]) => `<a href="${href}" class="${route.startsWith(href.slice(1)) ? 'active' : ''}">${label}</a>`).join('');
@@ -97,6 +100,8 @@ function route(): void {
         });
       },
     });
+  } else if (r.startsWith('/clubs')) {
+    renderClubs(view);
   } else if (r.startsWith('/coaches')) {
     renderCoaches(view);
     installTooltips(view);
@@ -121,4 +126,5 @@ window.addEventListener('hashchange', route);
 // Loading screen first; the first view renders underneath once imported faces are in memory
 // (capped, so a slow or blocked IndexedDB never holds the game back).
 void bootScreen();
-void Promise.race([loadFaces(), new Promise((r) => setTimeout(r, 500))]).then(() => route());
+applyClubOverrides();
+void Promise.race([Promise.all([loadFaces(), loadLogos()]), new Promise((r) => setTimeout(r, 500))]).then(() => route());

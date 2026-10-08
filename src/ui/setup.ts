@@ -1,4 +1,5 @@
 import { type Coach, coachById, coachTactics } from '../data/coaches';
+import { crestHtml } from '../data/clubCustom';
 import { CLUBS, clubById } from '../data/clubs';
 import { coachCard, coachSelectHtml } from './coachUi';
 import { overall } from '../engine/attributes';
@@ -110,7 +111,7 @@ export function renderSetup(container: HTMLElement, initial: Partial<MatchSetup>
     const st = strength(club, tac.formation);
     card.innerHTML = `
       <div class="team-head">
-        <div class="crest" style="background:${club.colors.primary};color:${club.colors.text};border-color:${club.colors.secondary}">${club.short}</div>
+        ${crestHtml(club, 44)}
         <select class="club-select" aria-label="${t(side)}">${CLUBS.map((c) => `<option value="${c.id}" ${c.id === club.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       </div>
       <div class="squad-strength"><span>${t(side)}</span><span>OVR <b>${st.ovr}</b></span><span>DEF <b>${st.def}</b></span><span>MID <b>${st.mid}</b></span><span>ATT <b>${st.att}</b></span></div>

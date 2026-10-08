@@ -1,4 +1,5 @@
 import { CLUBS, clubById } from '../data/clubs';
+import { crestHtml } from '../data/clubCustom';
 import { type Fixture, type SeasonState, computeTable, newSeason, nextRound, topScorers } from '../league/league';
 import { type SimPool, sharedPool } from '../league/pool';
 import { t } from '../i18n';
@@ -37,7 +38,7 @@ export function renderLeague(root: HTMLElement, season: SeasonState, onWatch: (f
 
   const kit = (id: string) => {
     const c = clubById(id);
-    return `<i class="kit-dot" style="background:${c.colors.primary};outline:2px solid ${c.colors.secondary};outline-offset:-2px"></i>`;
+    return crestHtml(c, 22);
   };
 
   const draw = () => {

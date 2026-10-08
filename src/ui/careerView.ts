@@ -1,4 +1,5 @@
 import { DEFAULT_LOOK, LOOK_COUNTS, LOOK_KEYS, LOOK_LABELS, type LookKey, portraitHtml, randomLook } from '../career/avatar';
+import { crestHtml } from '../data/clubCustom';
 import { MAX_FACES, deleteFace, importFaces, listFaces, loadFaces } from '../career/faces';
 import {
   type CareerCoach,
@@ -334,7 +335,7 @@ function renderClubPick(root: HTMLElement, coach: CareerCoach, deps: CareerDeps,
       <div class="club-grid">${CLUBS.map((c) => {
         const st = strength(c, c.tactics.formation);
         return `<button type="button" class="panel club-card ${c.id === chosen ? 'on' : ''}" data-club="${c.id}" aria-pressed="${c.id === chosen}">
-          <span class="crest" style="background:${c.colors.primary};color:${c.colors.text};border-color:${c.colors.secondary}">${c.short}</span>
+          ${crestHtml(c, 44)}
           <b>${esc(c.name)}</b>
           <span class="club-ovr num">OVR ${st.ovr}</span>
           <span class="muted">${l.target}: <b class="tgt">${l.tgt(boardTarget(c.id))}</b></span>
@@ -390,9 +391,9 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
           return `<section class="panel next-match">
             <div class="card-title"><h3>${l.nextMatch}</h3><span class="muted">${l.round} ${f.round}/${Math.max(...state.league.fixtures.map((x) => x.round))} · ${homeGame ? l.home : l.away}</span></div>
             <div class="versus">
-              <div class="vs-side"><span class="crest" style="background:${club.colors.primary};color:${club.colors.text};border-color:${club.colors.secondary}">${club.short}</span><b>${esc(club.name)}</b></div>
+              <div class="vs-side">${crestHtml(club, 44)}<b>${esc(club.name)}</b></div>
               <span class="vs-mark">${l.vs}</span>
-              <div class="vs-side"><span class="crest" style="background:${opp.colors.primary};color:${opp.colors.text};border-color:${opp.colors.secondary}">${opp.short}</span><b>${esc(opp.name)}</b><span class="muted num">OVR ${st.ovr}</span></div>
+              <div class="vs-side">${crestHtml(opp, 44)}<b>${esc(opp.name)}</b><span class="muted num">OVR ${st.ovr}</span></div>
             </div>
             <div class="opp-coach">${coachAvatar(oc, 48)}<div><span class="muted">${l.opponentCoach}</span><div><b>${esc(coachName(oc))}</b> · <span class="chip">${oc.formations[0]}</span></div><p>${esc(oc.style[lang])}</p></div></div>
             <div class="next-actions">
@@ -421,7 +422,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
       <section class="panel career-head">
         <div class="ch-coach">${coachAvatar(me, 76)}<div><div class="ch-name">${esc(me.name)}</div>
           <div class="muted">${lang === 'ru' ? STYLE_TEXT[state.coach.style].nameRu : STYLE_TEXT[state.coach.style].nameEn} · ${l.reputation}: ${l.rep(state.reputation)}</div></div></div>
-        <div class="ch-club"><span class="crest" style="background:${club.colors.primary};color:${club.colors.text};border-color:${club.colors.secondary}">${club.short}</span>
+        <div class="ch-club">${crestHtml(club, 44)}
           <div><b>${esc(club.name)}</b><div class="muted">${l.season} ${seasonLabel(state.season)}</div></div></div>
         <div class="ch-board">
           <div class="meter-label"><span>${l.board}</span><b class="state ${confClass}">${l.conf(state.confidence)}</b></div>
@@ -439,7 +440,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
               .map((r, i) => {
                 const c = clubById(r.club);
                 const coach = clubSide(state, r.club).coach;
-                return `<tr class="${r.club === state.clubId ? 'me' : ''}"><td>${i + 1}</td><td class="name-cell"><span class="cell-flex"><i class="kit-dot" style="background:${c.colors.primary};outline:2px solid ${c.colors.secondary};outline-offset:-2px"></i>${esc(c.name)}</span></td>
+                return `<tr class="${r.club === state.clubId ? 'me' : ''}"><td>${i + 1}</td><td class="name-cell"><span class="cell-flex">${crestHtml(c, 22)}${esc(c.name)}</span></td>
                   <td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf}:${r.ga}</td><td><b>${r.pts}</b></td><td class="name-cell"><span class="cell-flex">${coachAvatar(coach, 22)}<span class="muted">${esc(coachName(coach))}</span></span></td></tr>`;
               })
               .join('')}</tbody></table></div></section>
@@ -562,7 +563,7 @@ function renderSeasonEnd(root: HTMLElement, state: CareerState, deps: CareerDeps
         <div class="club-grid">${offers
           .map((id) => {
             const c = clubById(id);
-            return `<button type="button" class="panel club-card" data-offer="${id}"><span class="crest" style="background:${c.colors.primary};color:${c.colors.text};border-color:${c.colors.secondary}">${c.short}</span><b>${esc(c.name)}</b><span class="muted">${l.target}: <b>${l.tgt(boardTarget(id))}</b></span><span class="btn small primary">${l.accept}</span></button>`;
+            return `<button type="button" class="panel club-card" data-offer="${id}">${crestHtml(c, 44)}<b>${esc(c.name)}</b><span class="muted">${l.target}: <b>${l.tgt(boardTarget(id))}</b></span><span class="btn small primary">${l.accept}</span></button>`;
           })
           .join('')}</div>
         <button class="btn" type="button" id="restart">${l.newCareerBtn}</button>

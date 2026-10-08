@@ -1,5 +1,6 @@
 import { type Coach, COACHES, coachById, coachTactics } from '../data/coaches';
-import { CLUBS, clubById } from '../data/clubs';
+import { leagueClubIds, leagueOf } from '../data/clubSeeds';
+import { clubById, leagueClubs } from '../data/clubs';
 import { overall } from '../engine/attributes';
 import { FORMATIONS } from '../engine/formations';
 import { Rng } from '../engine/rng';
@@ -116,29 +117,31 @@ export interface CareerState {
 export const seasonLabel = (season: number) => `${FIRST_YEAR + season - 1}/${String((FIRST_YEAR + season) % 100).padStart(2, '0')}`;
 
 /** Clubs ranked by squad strength (best XI in their usual formation), strongest first. */
-export function strengthRanking(): string[] {
+export function strengthRanking(clubIds: string[]): string[] {
   const score = (id: string) => {
     const c = clubById(id);
     const slots = FORMATIONS[c.tactics.formation];
     const { lineup } = pickLineup(c.players, slots);
     return lineup.reduce((s, p, i) => s + overall(p.attrs, slots[i].role), 0) / lineup.length;
   };
-  return [...CLUBS].map((c) => c.id).sort((a, b) => score(b) - score(a));
+  return [...clubIds].sort((a, b) => score(b) - score(a));
 }
 
-/** The board's minimum acceptable league position for a club, from its standing in the league. */
-export function boardTarget(clubId: string): number {
-  const rank = strengthRanking().indexOf(clubId) + 1;
+/** The board's minimum acceptable league position for a club, from its standing in its league. */
+export function boardTarget(clubId: string, clubIds: string[] = leagueClubIds(leagueOf(clubId))): number {
+  const rank = strengthRanking(clubIds).indexOf(clubId) + 1;
   if (rank <= 1) return 1;
   if (rank <= 2) return 2;
   if (rank <= 4) return 4;
   if (rank <= 6) return 6;
-  return CLUBS.length - 1; // avoid finishing bottom
+  return clubIds.length - 1; // avoid finishing bottom
 }
 
 export function newCareer(coach: CareerCoach, clubId: string, seed: number): CareerState {
+  const leagueId = leagueOf(clubId);
+  const clubs = leagueClubs(leagueId);
   const coaches: Record<string, string> = {};
-  for (const c of CLUBS) coaches[c.id] = c.coachId ?? 'ancelotti';
+  for (const c of clubs) coaches[c.id] = c.coachId ?? 'ancelotti';
   const replaced = coaches[clubId];
   coaches[clubId] = PLAYER_COACH;
   const club = clubById(clubId);
@@ -150,7 +153,7 @@ export function newCareer(coach: CareerCoach, clubId: string, seed: number): Car
     coach,
     clubId,
     season: 1,
-    league: newSeason(CLUBS, seed),
+    league: newSeason(clubs, seed, leagueId),
     coaches,
     tactics: { formation: style.formation, ...style.tactics },
     confidence: 60,
@@ -235,12 +238,12 @@ export function endSeason(state: CareerState): SeasonSummary {
   const table = computeTable(state.league.clubs, state.league.fixtures);
   const position = table.findIndex((r) => r.club === state.clubId) + 1;
   const row = table[position - 1];
-  const target = boardTarget(state.clubId);
+  const target = boardTarget(state.clubId, state.league.clubs);
   const met = position <= target;
   const champion = position === 1;
   const confidenceDelta = champion ? 35 : met ? 20 : position - target === 1 ? -15 : -35;
   state.confidence = Math.max(0, Math.min(100, state.confidence + confidenceDelta));
-  state.reputation = Math.min(100, state.reputation + (champion ? 18 : met ? 8 : position <= CLUBS.length / 2 ? 3 : 0));
+  state.reputation = Math.min(100, state.reputation + (champion ? 18 : met ? 8 : position <= state.league.clubs.length / 2 ? 3 : 0));
 
   // Coaching attributes grow with experience: the style's focus areas every season,
   // plus extra points for a successful one.
@@ -316,7 +319,7 @@ export function startNextSeason(state: CareerState, newClubId?: string): void {
     });
   }
   state.season++;
-  state.league = newSeason(CLUBS, (state.seed + state.season * 7919) >>> 0);
+  state.league = newSeason(state.league.clubs.map(clubById), (state.seed + state.season * 7919) >>> 0, state.league.leagueId);
   state.status = 'active';
   state.lastSummary = null;
   state.news = state.news.slice(0, 30);
@@ -324,7 +327,7 @@ export function startNextSeason(state: CareerState, newClubId?: string): void {
 
 /** Clubs that would hire a sacked coach: those with modest expectations. */
 export function jobOffers(state: CareerState): string[] {
-  const ranking = strengthRanking();
+  const ranking = strengthRanking(state.league.clubs);
   return ranking.slice(-4).filter((id) => id !== state.clubId).slice(-2);
 }
 

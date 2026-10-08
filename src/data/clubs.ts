@@ -1,39 +1,8 @@
 import { Rng, hashString } from '../engine/rng';
 import type { Attributes, ClubData, PlayerData, Role } from '../engine/types';
 import { coachById, coachTactics } from './coaches';
-import { FIRST_NAMES, LAST_NAMES } from './names';
-
-interface ClubSeed {
-  id: string;
-  name: string;
-  short: string;
-  city: string;
-  strength: number;
-  primary: string;
-  secondary: string;
-  text: string;
-  coach: string;
-}
-
-/** Fictional league. Strength is the average attribute level the squad is generated around. */
-const SEEDS: ClubSeed[] = [
-  { id: 'nrd', name: 'Nordhavn Athletic', short: 'NOR', city: 'Nordhavn', strength: 78, primary: '#1d4ed8', secondary: '#ffffff', text: '#ffffff',
-    coach: 'guardiola' },
-  { id: 'vlr', name: 'Valoria FC', short: 'VAL', city: 'Valoria', strength: 77, primary: '#b91c1c', secondary: '#fbbf24', text: '#ffffff',
-    coach: 'ancelotti' },
-  { id: 'kst', name: 'Kestrel United', short: 'KES', city: 'Kestrel', strength: 74, primary: '#111827', secondary: '#f59e0b', text: '#f59e0b',
-    coach: 'conte' },
-  { id: 'arg', name: 'Argent City', short: 'ARG', city: 'Argent', strength: 72, primary: '#7dd3fc', secondary: '#0c4a6e', text: '#0c4a6e',
-    coach: 'arteta' },
-  { id: 'brk', name: 'Brakwater Rovers', short: 'BRK', city: 'Brakwater', strength: 70, primary: '#15803d', secondary: '#ffffff', text: '#ffffff',
-    coach: 'dyche' },
-  { id: 'ost', name: 'Ostmark Sporting', short: 'OST', city: 'Ostmark', strength: 69, primary: '#7c3aed', secondary: '#e9d5ff', text: '#ffffff',
-    coach: 'simeone' },
-  { id: 'ptr', name: 'Port Rhenna', short: 'PRH', city: 'Rhenna', strength: 67, primary: '#ea580c', secondary: '#1f2937', text: '#ffffff',
-    coach: 'iraola' },
-  { id: 'hlm', name: 'Holmgard Town', short: 'HOL', city: 'Holmgard', strength: 65, primary: '#facc15', secondary: '#1e3a8a', text: '#1e3a8a',
-    coach: 'mourinho' },
-];
+import { type ClubSeed, CLUB_SEEDS, leagueById, leagueClubIds } from './clubSeeds';
+import { FIRST_NAMES, LAST_NAMES, NAMES_BY_COUNTRY } from './names';
 
 const ATTR_KEYS: (keyof Attributes)[] = [
   'pace', 'acceleration', 'stamina', 'passing', 'vision', 'shooting', 'dribbling', 'firstTouch', 'tackling', 'positioning',
@@ -62,7 +31,7 @@ const SQUAD: Role[] = [
   'GK', 'GK', 'CB', 'CB', 'CB', 'LB', 'RB', 'LWB', 'DM', 'CM', 'CM', 'CM', 'AM', 'LM', 'RM', 'LW', 'RW', 'ST', 'ST', 'ST',
 ];
 
-export function generatePlayer(rng: Rng, role: Role, level: number, number: number, clubId: string): PlayerData {
+export function generatePlayer(rng: Rng, role: Role, level: number, number: number, clubId: string, names = { first: FIRST_NAMES, last: LAST_NAMES }): PlayerData {
   const base = level + rng.normal(0, 4);
   const prof = PROFILE[role];
   const attrs = {} as Attributes;
@@ -70,11 +39,12 @@ export function generatePlayer(rng: Rng, role: Role, level: number, number: numb
     const v = base + (prof[k] ?? 0) + rng.normal(0, 6);
     attrs[k] = Math.round(Math.min(97, Math.max(12, v)));
   }
-  const name = `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
+  const name = `${rng.pick(names.first)} ${rng.pick(names.last)}`;
   return { id: `${clubId}-${number}`, name, number, position: role, age: rng.int(18, 34), attrs };
 }
 
 function buildClub(s: ClubSeed): ClubData {
+  const coach = s.coach ?? `staff-${s.id}`;
   const rng = new Rng(hashString(s.id));
   const used = new Set<number>();
   const preferred: Partial<Record<Role, number[]>> = {
@@ -87,17 +57,24 @@ function buildClub(s: ClubSeed): ClubData {
     used.add(n);
     // First-choice players are a bit better than the back-ups.
     const level = s.strength + (i < 2 ? 0 : 0) + (i % 3 === 2 ? -4 : 0);
-    return generatePlayer(rng, role, level, n, s.id);
+    // Mostly local names, with a few signings from abroad.
+    const country = leagueById(s.league).country;
+    const pool = country !== 'intl' && rng.chance(0.7) ? NAMES_BY_COUNTRY[country] : undefined;
+    return generatePlayer(rng, role, level, n, s.id, pool);
   });
   return {
     id: s.id, name: s.name, short: s.short, city: s.city,
     colors: { primary: s.primary, secondary: s.secondary, text: s.text },
     keeperColors: { primary: '#10b981', text: '#052e16' },
-    tactics: coachTactics(coachById(s.coach)!), coachId: s.coach, players,
+    tactics: coachTactics(coachById(coach)!), coachId: coach, players,
   };
 }
 
-export const CLUBS: ClubData[] = SEEDS.map(buildClub);
+/** Every club in the game, across all leagues. */
+export const CLUBS: ClubData[] = CLUB_SEEDS.map(buildClub);
+
+/** Clubs of one league. */
+export const leagueClubs = (leagueId: string): ClubData[] => leagueClubIds(leagueId).map(clubById);
 
 export function clubById(id: string): ClubData {
   const c = CLUBS.find((x) => x.id === id);

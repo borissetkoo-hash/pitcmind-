@@ -4,7 +4,7 @@ import {
   PLAYER_COACH, STYLES, boardTarget, clubSide, endSeason, newCareer, nextUserFixture, playerCoach, seasonComplete,
   startNextSeason, type CareerCoach,
 } from '../src/career/career';
-import { CLUBS } from '../src/data/clubs';
+import { LEAGUES, leagueClubIds } from '../src/data/clubSeeds';
 import { Rng } from '../src/engine/rng';
 
 const coach = (): CareerCoach => ({ firstName: 'Boris', lastName: 'Setkov', flag: '🇷🇺', look: { ...DEFAULT_LOOK }, style: 'pressing', traits: { ...STYLES.pressing.traits } });
@@ -31,10 +31,20 @@ describe('career mode', () => {
     expect(nextUserFixture(s)!.round).toBe(1);
   });
 
-  it('sets tougher objectives for stronger clubs', () => {
-    const targets = CLUBS.map((c) => boardTarget(c.id));
-    expect(Math.min(...targets)).toBe(1);
-    expect(Math.max(...targets)).toBe(CLUBS.length - 1);
+  it('sets tougher objectives for stronger clubs, within each league', () => {
+    for (const lg of LEAGUES) {
+      const ids = leagueClubIds(lg.id);
+      const targets = ids.map((id) => boardTarget(id));
+      expect(Math.min(...targets)).toBe(1);
+      expect(Math.max(...targets)).toBe(ids.length - 1);
+    }
+  });
+
+  it('plays a career inside the chosen club’s league', () => {
+    const s = newCareer(coach(), 'mnr', 11);
+    expect(s.league.leagueId).toBe('eng');
+    expect([...s.league.clubs].sort()).toEqual([...leagueClubIds('eng')].sort());
+    expect(Object.keys(s.coaches).sort()).toEqual([...leagueClubIds('eng')].sort());
   });
 
   it('rewards a title-winning season with growth and confidence, then moves on', () => {
@@ -53,7 +63,7 @@ describe('career mode', () => {
     expect(s.status).toBe('active');
     expect(s.league.fixtures.every((f) => !f.result)).toBe(true);
     expect(Object.keys(s.coaches).filter((k) => s.coaches[k] !== coachesBefore[k]).length).toBeGreaterThanOrEqual(1);
-    expect(new Set(Object.values(s.coaches)).size).toBe(CLUBS.length); // nobody coaches two clubs
+    expect(new Set(Object.values(s.coaches)).size).toBe(s.league.clubs.length); // nobody coaches two clubs
   });
 
   it('sacks a coach after repeated failure and offers a smaller club', () => {

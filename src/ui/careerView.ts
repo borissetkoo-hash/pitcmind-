@@ -24,7 +24,9 @@ import {
   userPosition,
 } from '../career/career';
 import { deleteCareer, loadCareer, saveCareer } from '../career/storage';
-import { CLUBS, clubById } from '../data/clubs';
+import { LEAGUES } from '../data/clubSeeds';
+import { clubById, leagueClubs } from '../data/clubs';
+import { leagueName, leagueTabsHtml } from './leagueUi';
 import type { Match } from '../engine/match';
 import { computeTable, type Fixture, type FixtureResult } from '../league/league';
 import { sharedPool } from '../league/pool';
@@ -56,7 +58,7 @@ const L = {
     champion: 'Чемпион!', growth: 'Рост атрибутов', noGrowth: 'Атрибуты без изменений', startNext: 'Начать сезон', sacked: 'Вас уволили',
     sackedSub: 'Правление потеряло доверие. Есть предложения от клубов поскромнее:', accept: 'Принять предложение', newCareerBtn: 'Начать новую карьеру',
     w: 'В', d: 'Н', l: 'П', titles: 'Титулы', goals: 'Мячи', pos: 'Место', pts: 'О', saved: 'Прогресс сохраняется автоматически.',
-    tgt: (n: number) => (n === 1 ? 'чемпионство' : n === CLUBS.length - 1 ? 'не занять последнее место' : `топ-${n}`),
+    tgt: (n: number) => (n === 1 ? 'чемпионство' : n >= 7 ? 'не занять последнее место' : `топ-${n}`),
     rep: (r: number) => (r >= 80 ? 'Мировая' : r >= 55 ? 'Континентальная' : r >= 35 ? 'Национальная' : 'Местная'),
     conf: (c: number) => (c >= 70 ? 'Правление довольно' : c >= 40 ? 'Ситуация стабильная' : 'Под давлением'),
   },
@@ -79,7 +81,7 @@ const L = {
     champion: 'Champions!', growth: 'Attribute growth', noGrowth: 'No attribute changes', startNext: 'Start season', sacked: 'You have been sacked',
     sackedSub: 'The board has lost confidence. Smaller clubs have made offers:', accept: 'Accept offer', newCareerBtn: 'Start a new career',
     w: 'W', d: 'D', l: 'L', titles: 'Titles', goals: 'Goals', pos: 'Pos', pts: 'Pts', saved: 'Progress saves automatically.',
-    tgt: (n: number) => (n === 1 ? 'win the title' : n === CLUBS.length - 1 ? 'avoid finishing bottom' : `top ${n}`),
+    tgt: (n: number) => (n === 1 ? 'win the title' : n >= 7 ? 'avoid finishing bottom' : `top ${n}`),
     rep: (r: number) => (r >= 80 ? 'Worldwide' : r >= 55 ? 'Continental' : r >= 35 ? 'National' : 'Local'),
     conf: (c: number) => (c >= 70 ? 'Board delighted' : c >= 40 ? 'Stable' : 'Under pressure'),
   },
@@ -327,12 +329,15 @@ function playerCoachPreview(c: CareerCoach) {
 
 function renderClubPick(root: HTMLElement, coach: CareerCoach, deps: CareerDeps, onBack: () => void): void {
   const l = tr();
-  let chosen = CLUBS[CLUBS.length - 1].id;
+  let league = LEAGUES[0].id;
+  let chosen = leagueClubs(league).slice(-1)[0].id;
   const draw = () => {
+    const clubs = leagueClubs(league);
     root.innerHTML = `
       <section class="hero"><div><h1>${l.chooseClub}</h1><p>${l.chooseClubSub}</p></div>
         <div class="hero-coach">${portraitHtml(coach.look, 56)}<div><b>${esc(coach.firstName)} ${esc(coach.lastName)}</b><div class="muted">${coach.flag}</div></div></div></section>
-      <div class="club-grid">${CLUBS.map((c) => {
+      <div class="league-bar">${leagueTabsHtml(league)}</div>
+      <div class="club-grid">${clubs.map((c) => {
         const st = strength(c, c.tactics.formation);
         return `<button type="button" class="panel club-card ${c.id === chosen ? 'on' : ''}" data-club="${c.id}" aria-pressed="${c.id === chosen}">
           ${crestHtml(c, 44)}
@@ -342,6 +347,13 @@ function renderClubPick(root: HTMLElement, coach: CareerCoach, deps: CareerDeps,
         </button>`;
       }).join('')}</div>
       <div class="creator-actions"><button class="btn" type="button" id="back">← ${l.back}</button><button class="btn primary" type="button" id="start">${l.startCareer}</button></div>`;
+    root.querySelectorAll<HTMLButtonElement>('[data-league]').forEach((b) =>
+      b.addEventListener('click', () => {
+        league = b.dataset.league!;
+        chosen = leagueClubs(league).slice(-1)[0].id;
+        draw();
+      }),
+    );
     root.querySelectorAll<HTMLButtonElement>('[data-club]').forEach((b) =>
       b.addEventListener('click', () => {
         chosen = b.dataset.club!;
@@ -423,7 +435,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
         <div class="ch-coach">${coachAvatar(me, 76)}<div><div class="ch-name">${esc(me.name)}</div>
           <div class="muted">${lang === 'ru' ? STYLE_TEXT[state.coach.style].nameRu : STYLE_TEXT[state.coach.style].nameEn} · ${l.reputation}: ${l.rep(state.reputation)}</div></div></div>
         <div class="ch-club">${crestHtml(club, 44)}
-          <div><b>${esc(club.name)}</b><div class="muted">${l.season} ${seasonLabel(state.season)}</div></div></div>
+          <div><b>${esc(club.name)}</b><div class="muted">${esc(leagueName(state.league.leagueId ?? 'nor'))} · ${seasonLabel(state.season)}</div></div></div>
         <div class="ch-board">
           <div class="meter-label"><span>${l.board}</span><b class="state ${confClass}">${l.conf(state.confidence)}</b></div>
           <div class="meter ${confClass}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${state.confidence}"><i style="width:${state.confidence}%"></i></div>

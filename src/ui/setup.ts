@@ -2,6 +2,7 @@ import { type Coach, coachById, coachTactics } from '../data/coaches';
 import { crestHtml } from '../data/clubCustom';
 import { CLUBS, clubById } from '../data/clubs';
 import { coachCard, coachSelectHtml } from './coachUi';
+import { clubOptionsHtml } from './leagueUi';
 import { overall } from '../engine/attributes';
 import { FORMATIONS, FORMATION_IDS } from '../engine/formations';
 import { pickLineup } from '../engine/team';
@@ -18,7 +19,6 @@ export interface MatchSetup {
   seed: number;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** Team strength summary: average overall of the best XI per line. */
 export function strength(club: ClubData, formation: FormationId) {
@@ -112,7 +112,7 @@ export function renderSetup(container: HTMLElement, initial: Partial<MatchSetup>
     card.innerHTML = `
       <div class="team-head">
         ${crestHtml(club, 44)}
-        <select class="club-select" aria-label="${t(side)}">${CLUBS.map((c) => `<option value="${c.id}" ${c.id === club.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+        <select class="club-select" aria-label="${t(side)}">${clubOptionsHtml(club.id)}</select>
       </div>
       <div class="squad-strength"><span>${t(side)}</span><span>OVR <b>${st.ovr}</b></span><span>DEF <b>${st.def}</b></span><span>MID <b>${st.mid}</b></span><span>ATT <b>${st.att}</b></span></div>
       <div class="coach-pick"><label class="muted">${t('coach')}</label>${coachSelectHtml(coach?.id)}</div>

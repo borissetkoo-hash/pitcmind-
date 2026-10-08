@@ -1,6 +1,7 @@
 import type { ClubData } from '../engine/types';
 import { createImageStore, type ImportResult } from '../storage/imageStore';
 import { CLUBS } from './clubs';
+import { crestSvg, designFor } from './crest';
 
 /**
  * Player-made "real name fix": clubs can be renamed, recoloured and given a crest imported
@@ -82,5 +83,5 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&
 export function crestHtml(c: ClubData, size = 44): string {
   const logo = clubLogo(c.id);
   if (logo) return `<span class="crest crest-logo" style="width:${size}px;height:${size}px"><img src="${logo}" alt="${esc(c.name)}" width="${size}" height="${size}"></span>`;
-  return `<span class="crest" style="width:${size}px;height:${size}px;font-size:${Math.max(9, Math.round(size * 0.3))}px;background:${c.colors.primary};color:${c.colors.text};border-color:${c.colors.secondary}">${esc(c.short)}</span>`;
+  return `<span class="crest crest-gen" style="width:${size}px;height:${size}px">${crestSvg(designFor(c.id), c.colors, c.short, size)}</span>`;
 }

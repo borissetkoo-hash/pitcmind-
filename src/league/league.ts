@@ -111,13 +111,15 @@ export function topScorers(fixtures: Fixture[], limit = 10): { player: string; c
 
 export interface SeasonState {
   seed: number;
+  /** League the season belongs to (older saves predate leagues: the Northern League). */
+  leagueId?: string;
   clubs: string[];
   fixtures: Fixture[];
 }
 
-export function newSeason(clubs: ClubData[], seed: number): SeasonState {
+export function newSeason(clubs: ClubData[], seed: number, leagueId?: string): SeasonState {
   const ids = clubs.map((c) => c.id);
-  return { seed, clubs: ids, fixtures: roundRobin(ids, seed) };
+  return { seed, leagueId, clubs: ids, fixtures: roundRobin(ids, seed) };
 }
 
 export function nextRound(s: SeasonState): number | null {

@@ -1,4 +1,6 @@
-import { CLUBS, clubById } from '../data/clubs';
+import { LEAGUES } from '../data/clubSeeds';
+import { clubById, leagueClubs } from '../data/clubs';
+import { leagueTabsHtml } from './leagueUi';
 import { clubLogo, crestHtml, defaultIdentity, getOverride, importLogo, loadLogos, removeLogo, resetClub, setOverride } from '../data/clubCustom';
 import { getLang } from '../i18n';
 
@@ -81,9 +83,20 @@ export function renderClubs(root: HTMLElement): void {
     });
   };
 
-  root.innerHTML = `<section class="hero"><div><h1>${l.title}</h1><p>${l.sub}</p></div></section>
-    <p class="muted club-note">${l.note}</p>
-    <div class="club-edit-grid">${CLUBS.map((c) => card(c.id)).join('')}</div>`;
-  root.querySelectorAll<HTMLElement>('.club-edit').forEach(bind);
+  let league = LEAGUES[0].id;
+  const draw = () => {
+    root.innerHTML = `<section class="hero"><div><h1>${l.title}</h1><p>${l.sub}</p></div></section>
+      <p class="muted club-note">${l.note}</p>
+      <div class="league-bar">${leagueTabsHtml(league)}</div>
+      <div class="club-edit-grid">${leagueClubs(league).map((c) => card(c.id)).join('')}</div>`;
+    root.querySelectorAll<HTMLElement>('.club-edit').forEach(bind);
+    root.querySelectorAll<HTMLButtonElement>('[data-league]').forEach((b) =>
+      b.addEventListener('click', () => {
+        league = b.dataset.league!;
+        draw();
+      }),
+    );
+  };
+  draw();
   void loadLogos();
 }

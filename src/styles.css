@@ -433,3 +433,12 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .sb-team .crest { flex: none; }
 .field input, .field select { width: 100%; min-width: 0; }
 .crest-logo img { border-radius: 4px; }
+
+/* ── leagues & generated crests ── */
+.crest.crest-gen { border: 0 !important; background: none !important; border-radius: 0; }
+.crest-gen .crest-svg { width: 100%; height: 100%; display: block; }
+.league-bar { margin: -4px 0 16px; overflow-x: auto; }
+.league-tabs button { white-space: nowrap; font-family: inherit; }
+.menu-league { display: grid; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+.ml-name { font-size: 13px; color: var(--text-2); font-weight: 600; }
+.menu-league .menu-clubs { gap: 4px; }

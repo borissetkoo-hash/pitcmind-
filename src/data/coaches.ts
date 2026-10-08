@@ -1,9 +1,10 @@
+import { STAFF } from './staff';
 import type { AvatarLook } from '../career/avatar';
 import type { CoachTraits, FormationId, Tactics } from '../engine/types';
 
 export type { CoachTraits };
 
-export type CoachGroup = 'legends' | 'epl' | 'custom';
+export type CoachGroup = 'legends' | 'epl' | 'custom' | 'staff';
 
 export interface Coach {
   id: string;
@@ -168,8 +169,11 @@ export const COACHES: Coach[] = ROWS.map(([id, name, nameRu, flag, group, format
 
 export const NEUTRAL_TRAITS: CoachTraits = { passing: 10, organisation: 10, pressing: 10, counter: 10, setPieces: 10, aerial: 10, fitness: 10 };
 
+/** Real coaches plus the generated head coaches of clubs without one. */
+export const ALL_COACHES: Coach[] = [...COACHES, ...STAFF];
+
 export function coachById(id: string | undefined): Coach | undefined {
-  return COACHES.find((c) => c.id === id);
+  return ALL_COACHES.find((c) => c.id === id);
 }
 
 /** A coach's preferred set-up as full match tactics. */

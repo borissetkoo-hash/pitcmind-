@@ -1,5 +1,5 @@
 import { portraitHtml } from '../career/avatar';
-import { COACHES, type Coach, TRAIT_KEYS, coachById } from '../data/coaches';
+import { ALL_COACHES, type Coach, TRAIT_KEYS, coachById } from '../data/coaches';
 import { getLang, type Key, t } from '../i18n';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -46,11 +46,11 @@ export function coachCard(c: Coach, compact = false): string {
 /** Coach picker grouped like the source material: legends and the 2024/25 Premier League. */
 export function coachSelectHtml(selected: string | undefined): string {
   const group = (g: Coach['group']) =>
-    `<optgroup label="${t(`grp_${g}` as Key)}">${COACHES.filter((c) => c.group === g)
+    `<optgroup label="${t(`grp_${g}` as Key)}">${ALL_COACHES.filter((c) => c.group === g)
       .sort((a, b) => coachName(a).localeCompare(coachName(b)))
       .map((c) => `<option value="${c.id}" ${c.id === selected ? 'selected' : ''}>${c.flag} ${esc(coachName(c))}</option>`)
       .join('')}</optgroup>`;
-  return `<select class="coach-select" aria-label="${t('coach')}">${group('epl')}${group('legends')}</select>`;
+  return `<select class="coach-select" aria-label="${t('coach')}">${group('epl')}${group('legends')}${group('staff')}</select>`;
 }
 
 // ───────────────────────────── coaches page ──
@@ -63,10 +63,10 @@ const SHORT: Record<'ru' | 'en', Record<(typeof TRAIT_KEYS)[number], string>> = 
 export function renderCoaches(root: HTMLElement): void {
   let filter: 'all' | Coach['group'] = 'all';
   let sortKey: (typeof TRAIT_KEYS)[number] | 'name' = 'name';
-  let selected = COACHES[0].id;
+  let selected = ALL_COACHES[0].id;
 
   const draw = () => {
-    const rows = COACHES.filter((c) => filter === 'all' || c.group === filter).sort((a, b) =>
+    const rows = ALL_COACHES.filter((c) => (filter === 'all' ? c.group !== 'staff' : c.group === filter)).sort((a, b) =>
       sortKey === 'name' ? coachName(a).localeCompare(coachName(b)) : b.traits[sortKey] - a.traits[sortKey],
     );
     const sel = coachById(selected) ?? rows[0];
@@ -75,7 +75,7 @@ export function renderCoaches(root: HTMLElement): void {
     ).join('');
     root.innerHTML = `
       <section class="hero"><div><h1>${t('coaches')}</h1><p>${t('menuCoachesSub')}</p></div>
-        <div class="seg" role="group">${(['all', 'epl', 'legends'] as const)
+        <div class="seg" role="group">${(['all', 'epl', 'legends', 'staff'] as const)
           .map((g) => `<button type="button" data-filter="${g}" aria-pressed="${filter === g}">${g === 'all' ? t('all') : t(`grp_${g}` as Key)}</button>`)
           .join('')}</div></section>
       <div class="coaches-grid">

@@ -2,7 +2,9 @@ import { portraitHtml } from '../career/avatar';
 import { crestHtml } from '../data/clubCustom';
 import { seasonLabel } from '../career/career';
 import { peekCareer } from '../career/storage';
-import { CLUBS, clubById } from '../data/clubs';
+import { LEAGUES } from '../data/clubSeeds';
+import { clubById, leagueClubs } from '../data/clubs';
+import { leagueName } from './leagueUi';
 import { computeTable, nextRound, type SeasonState } from '../league/league';
 import { type Lang, getLang, setLang, t } from '../i18n';
 import { getSettings, updateSettings } from '../settings';
@@ -40,8 +42,8 @@ export function renderMenu(root: HTMLElement, season: SeasonState, onLangChange:
           ${next ? `<div class="menu-next">${t('nextMatch')}: <b>${esc(clubById(next.home).name)}</b> – <b>${esc(clubById(next.away).name)}</b></div>` : ''}
         </div>
         <div class="panel menu-card">
-          <h3>${t('clubs')}</h3>
-          <div class="menu-clubs">${CLUBS.map((c) => `<span title="${esc(c.name)}">${crestHtml(c, 40)}</span>`).join('')}</div>
+          <h3>${t('leagues')}</h3>
+          ${LEAGUES.map((lg) => `<div class="menu-league"><span class="ml-name">${esc(leagueName(lg.id))}</span><div class="menu-clubs">${leagueClubs(lg.id).map((c) => `<span title="${esc(c.name)}">${crestHtml(c, 26)}</span>`).join('')}</div></div>`).join('')}
         </div>
         <div class="panel menu-card" id="settingsCard" hidden>
           <h3>${t('settings')}</h3>

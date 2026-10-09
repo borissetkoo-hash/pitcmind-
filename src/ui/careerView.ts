@@ -24,6 +24,8 @@ import {
   userPosition,
 } from '../career/career';
 import { deleteCareer, loadCareer, saveCareer } from '../career/storage';
+import { clubFor, ensureMarket, fmtMoney, marketTick, transferWindow } from '../career/market';
+import { renderMarketTab, renderSquadTab } from './transfersUi';
 import { LEAGUES } from '../data/clubSeeds';
 import { clubById, leagueClubs } from '../data/clubs';
 import { leagueName, leagueTabsHtml } from './leagueUi';
@@ -57,6 +59,7 @@ const L = {
     seasonOver: 'Сезон завершён', finished: 'Итоговое место', verdictMet: 'Правление довольно: задача выполнена.', verdictMissed: 'Задача не выполнена — доверие правления падает.',
     champion: 'Чемпион!', growth: 'Рост атрибутов', noGrowth: 'Атрибуты без изменений', startNext: 'Начать сезон', sacked: 'Вас уволили',
     sackedSub: 'Правление потеряло доверие. Есть предложения от клубов поскромнее:', accept: 'Принять предложение', newCareerBtn: 'Начать новую карьеру',
+    tabOverview: 'Обзор', tabSquad: 'Состав', tabMarket: 'Трансферы', budgetShort: 'Бюджет', prize: 'Призовые', budgetNow: 'трансферный бюджет',
     w: 'В', d: 'Н', l: 'П', titles: 'Титулы', goals: 'Мячи', pos: 'Место', pts: 'О', saved: 'Прогресс сохраняется автоматически.',
     tgt: (n: number) => (n === 1 ? 'чемпионство' : n >= 7 ? 'не занять последнее место' : `топ-${n}`),
     rep: (r: number) => (r >= 80 ? 'Мировая' : r >= 55 ? 'Континентальная' : r >= 35 ? 'Национальная' : 'Местная'),
@@ -80,6 +83,7 @@ const L = {
     seasonOver: 'Season over', finished: 'Final position', verdictMet: 'The board is satisfied: objective met.', verdictMissed: 'Objective missed — the board’s confidence drops.',
     champion: 'Champions!', growth: 'Attribute growth', noGrowth: 'No attribute changes', startNext: 'Start season', sacked: 'You have been sacked',
     sackedSub: 'The board has lost confidence. Smaller clubs have made offers:', accept: 'Accept offer', newCareerBtn: 'Start a new career',
+    tabOverview: 'Overview', tabSquad: 'Squad', tabMarket: 'Transfers', budgetShort: 'Budget', prize: 'Prize money', budgetNow: 'transfer budget',
     w: 'W', d: 'D', l: 'L', titles: 'Titles', goals: 'Goals', pos: 'Pos', pts: 'Pts', saved: 'Progress saves automatically.',
     tgt: (n: number) => (n === 1 ? 'win the title' : n >= 7 ? 'avoid finishing bottom' : `top ${n}`),
     rep: (r: number) => (r >= 80 ? 'Worldwide' : r >= 55 ? 'Continental' : r >= 35 ? 'National' : 'Local'),
@@ -115,7 +119,10 @@ function matchToResult(m: Match, f: Fixture): FixtureResult {
 function overridesFor(state: CareerState, f: Fixture) {
   const h = clubSide(state, f.home);
   const a = clubSide(state, f.away);
-  return { homeCoach: h.coach.traits, awayCoach: a.coach.traits, homeTactics: h.tactics, awayTactics: a.tactics };
+  return {
+    homeCoach: h.coach.traits, awayCoach: a.coach.traits, homeTactics: h.tactics, awayTactics: a.tactics,
+    homePlayers: state.squads?.[f.home], awayPlayers: state.squads?.[f.away],
+  };
 }
 
 /** Fixtures that should already have been played: every round up to the user's latest result. */
@@ -148,6 +155,7 @@ export function renderCareer(root: HTMLElement, deps: CareerDeps): void {
 }
 
 function showCareer(root: HTMLElement, state: CareerState, deps: CareerDeps): void {
+  ensureMarket(state);
   if (state.status === 'active' && seasonComplete(state)) {
     endSeason(state);
     saveCareer(state);
@@ -381,6 +389,20 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
   let showTactics = false;
   let busy = false;
   let confirmDelete = false;
+  let tab: 'overview' | 'squad' | 'market' = 'overview';
+
+  const tabsHtml = () => {
+    const m = ensureMarket(state);
+    const open = transferWindow(state).open;
+    const item = (id: typeof tab, label: string, badge = '') =>
+      `<button type="button" role="tab" data-tab="${id}" aria-selected="${tab === id}">${label}${badge}</button>`;
+    return `<nav class="career-tabs" role="tablist">
+      ${item('overview', l.tabOverview)}
+      ${item('squad', l.tabSquad, m.offers.length ? `<span class="badge">${m.offers.length}</span>` : '')}
+      ${item('market', l.tabMarket, open ? '<span class="dot" aria-hidden="true"></span>' : '')}
+      <span class="tab-budget muted">${l.budgetShort} <b class="num">${fmtMoney(m.budget)}</b></span>
+    </nav>`;
+  };
 
   const draw = () => {
     const f = nextUserFixture(state);
@@ -399,7 +421,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
           const oppId = homeGame ? f.away : f.home;
           const opp = clubById(oppId);
           const oc = clubSide(state, oppId).coach;
-          const st = strength(opp, clubSide(state, oppId).tactics.formation);
+          const st = strength(clubFor(state, oppId), clubSide(state, oppId).tactics.formation);
           return `<section class="panel next-match">
             <div class="card-title"><h3>${l.nextMatch}</h3><span class="muted">${l.round} ${f.round}/${Math.max(...state.league.fixtures.map((x) => x.round))} · ${homeGame ? l.home : l.away}</span></div>
             <div class="versus">
@@ -442,7 +464,8 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
           <div class="muted">${l.objective}: <b>${l.tgt(target)}</b> · ${l.now}: <b class="${onTrack ? 'ok' : 'risk'}">${pos} ${l.place}</b></div>
         </div>
       </section>
-      <div class="career-grid">
+      ${tabsHtml()}
+      ${tab !== 'overview' ? '<div id="tabBox" class="tab-box"></div>' : `<div class="career-grid">
         <div class="career-main">
           ${nextCard}
           ${roundResults ? `<section class="panel pad"><div class="card-title"><h3>${l.roundResults} · ${l.round} ${lastRound}</h3></div>${roundResults}</section>` : ''}
@@ -471,9 +494,26 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
               : `<p class="muted">${l.saved}</p><button class="btn small" type="button" id="delete">${l.deleteCareer}</button>`}
           </section>
         </aside>
-      </div>`;
+      </div>`}`;
 
-    if (showTactics) {
+    if (tab !== 'overview') {
+      const box = root.querySelector<HTMLElement>('#tabBox')!;
+      const changed = () => {
+        saveCareer(state);
+        const y = window.scrollY;
+        draw();
+        window.scrollTo(0, y);
+      };
+      (tab === 'squad' ? renderSquadTab : renderMarketTab)(box, state, changed);
+    }
+    root.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((b) =>
+      b.addEventListener('click', () => {
+        tab = b.dataset.tab as typeof tab;
+        draw();
+      }),
+    );
+
+    if (showTactics && tab === 'overview') {
       root.querySelector('#tacticsBox')!.appendChild(
         tacticsControls(state.tactics, (nt) => {
           state.tactics = { ...nt };
@@ -508,6 +548,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
     busy = true;
     draw();
     await catchUp(state, () => root.isConnected && draw());
+    marketTick(state);
     busy = false;
     saveCareer(state);
     if (!root.isConnected) return;
@@ -531,14 +572,17 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
     const h = clubSide(state, f.home);
     const a = clubSide(state, f.away);
     const setup: MatchSetup = {
-      home: clubById(f.home), away: clubById(f.away), homeTactics: h.tactics, awayTactics: a.tactics,
+      home: clubFor(state, f.home), away: clubFor(state, f.away), homeTactics: h.tactics, awayTactics: a.tactics,
       homeCoach: h.coach, awayCoach: a.coach, seed: f.seed,
     };
     deps.playLive(setup, f.home === state.clubId ? 0 : 1, (m) => {
       recordResult(state, f.id, matchToResult(m, f));
       saveCareer(state);
       // The rest of the round plays in the background while the report is on screen.
-      void catchUp(state, () => undefined);
+      void catchUp(state, () => undefined).then(() => {
+        marketTick(state);
+        saveCareer(state);
+      });
     });
   };
 
@@ -601,6 +645,7 @@ function renderSeasonEnd(root: HTMLElement, state: CareerState, deps: CareerDeps
       ${s.champion ? `<div class="trophy">🏆 ${l.champion}</div>` : ''}
       <div class="final-pos"><span class="num">${s.position}</span><span class="muted">${l.finished} · ${esc(club.name)}</span></div>
       <p class="${s.met ? 'ok' : 'risk'}">${s.met ? l.verdictMet : l.verdictMissed} (${s.confidenceDelta > 0 ? '+' : ''}${s.confidenceDelta})</p>
+      ${s.prize ? `<p>💰 ${l.prize}: <b class="num">${fmtMoney(s.prize)}</b> · ${l.budgetNow}: <b class="num">${fmtMoney(ensureMarket(state).budget)}</b></p>` : ''}
       <div><h3>${l.growth}</h3>
         <div class="growth">${growth.length
           ? growth.map(([k, v]) => `<span class="chip up">${t(`tr_${k}` as Key)} <b class="${traitClass(state.coach.traits[k])}">${state.coach.traits[k]}</b> (+${v})</span>`).join('')

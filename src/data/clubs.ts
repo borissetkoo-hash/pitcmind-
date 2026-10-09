@@ -27,7 +27,8 @@ const PROFILE: Record<Role, Partial<Attributes>> = {
   ST: { shooting: 11, composure: 7, heading: 5, firstTouch: 3, tackling: -22, passing: -4, goalkeeping: -60 },
 };
 
-const SQUAD: Role[] = [
+/** Squad template: 20 players by position. */
+export const SQUAD: Role[] = [
   'GK', 'GK', 'CB', 'CB', 'CB', 'LB', 'RB', 'LWB', 'DM', 'CM', 'CM', 'CM', 'AM', 'LM', 'RM', 'LW', 'RW', 'ST', 'ST', 'ST',
 ];
 
@@ -68,6 +69,15 @@ function buildClub(s: ClubSeed): ClubData {
     keeperColors: { primary: '#10b981', text: '#052e16' },
     tactics: coachTactics(coachById(coach)!), coachId: coach, players,
   };
+}
+
+/** A youngster from the club's academy (refills a squad that sold players). */
+export function academyPlayer(clubId: string, role: Role, rng: Rng, number: number, id: string): PlayerData {
+  const s = CLUB_SEEDS.find((x) => x.id === clubId)!;
+  const country = leagueById(s.league).country;
+  const pool = country !== 'intl' ? NAMES_BY_COUNTRY[country] : undefined;
+  const p = generatePlayer(rng, role, s.strength - 7, number, clubId, pool);
+  return { ...p, id, age: rng.int(17, 19) };
 }
 
 /** Every club in the game, across all leagues. */

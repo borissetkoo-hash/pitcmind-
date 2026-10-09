@@ -8,6 +8,8 @@ import { pickLineup } from '../engine/team';
 import type { CoachTraits, FormationId, Tactics } from '../engine/types';
 import { computeTable, type Fixture, type FixtureResult, newSeason, nextRound, type SeasonState } from '../league/league';
 import type { AvatarLook } from './avatar';
+import { type MarketState, closeSeasonMarket, initMarket, resetMarketForClub } from './market';
+import type { PlayerData } from '../engine/types';
 
 export const PLAYER_COACH = 'player';
 const FIRST_YEAR = 2026;
@@ -94,6 +96,8 @@ export interface SeasonSummary {
   growth: Partial<CoachTraits>;
   confidenceDelta: number;
   sacked: boolean;
+  /** Prize money paid into the transfer budget (€M). */
+  prize?: number;
 }
 
 export interface CareerState {
@@ -112,6 +116,9 @@ export interface CareerState {
   news: NewsItem[];
   status: 'active' | 'seasonOver' | 'sacked';
   lastSummary: SeasonSummary | null;
+  /** Rosters of clubs that changed since the start (transfers, loans); others use the generated squad. */
+  squads?: Record<string, PlayerData[]>;
+  market?: MarketState;
 }
 
 export const seasonLabel = (season: number) => `${FIRST_YEAR + season - 1}/${String((FIRST_YEAR + season) % 100).padStart(2, '0')}`;
@@ -147,7 +154,7 @@ export function newCareer(coach: CareerCoach, clubId: string, seed: number): Car
   const club = clubById(clubId);
   const style = STYLES[coach.style];
   const old = coachById(replaced);
-  return {
+  const state: CareerState = {
     version: 1,
     seed,
     coach,
@@ -168,7 +175,10 @@ export function newCareer(coach: CareerCoach, clubId: string, seed: number): Car
     ],
     status: 'active',
     lastSummary: null,
+    squads: {},
   };
+  state.market = initMarket(state);
+  return state;
 }
 
 /** The created coach as a regular Coach, so every existing coach UI and the engine accept him. */
@@ -273,8 +283,9 @@ export function endSeason(state: CareerState): SeasonSummary {
       : { season: state.season, ru: `Сезон ${seasonLabel(state.season)} завершён: ${position}-е место.`, en: `Season ${seasonLabel(state.season)} over: finished ${position}${ordinal(position)}.` },
   );
   const sacked = state.confidence < 15;
+  const prize = closeSeasonMarket(state, position);
   state.status = sacked ? 'sacked' : 'seasonOver';
-  state.lastSummary = { position, target, met, champion, growth, confidenceDelta, sacked };
+  state.lastSummary = { position, target, met, champion, growth, confidenceDelta, sacked, prize };
   return state.lastSummary;
 }
 
@@ -294,6 +305,7 @@ export function startNextSeason(state: CareerState, newClubId?: string): void {
     state.coaches[newClubId] = PLAYER_COACH;
     state.clubId = newClubId;
     state.confidence = 55;
+    resetMarketForClub(state);
     const club = clubById(newClubId);
     const old = coachById(displaced);
     state.news.unshift({

@@ -9,6 +9,8 @@ import type { CoachTraits, FormationId, Tactics } from '../engine/types';
 import { computeTable, type Fixture, type FixtureResult, newSeason, nextRound, type SeasonState } from '../league/league';
 import type { AvatarLook } from './avatar';
 import { type MarketState, closeSeasonMarket, initMarket, resetMarketForClub } from './market';
+import { DEFAULT_TRAINING, type PlayerStatus, type Training, markSeasonStart, seasonRollover } from './development';
+import type { PlayerReport } from '../engine/match';
 import type { PlayerData } from '../engine/types';
 
 export const PLAYER_COACH = 'player';
@@ -119,6 +121,13 @@ export interface CareerState {
   /** Rosters of clubs that changed since the start (transfers, loans); others use the generated squad. */
   squads?: Record<string, PlayerData[]>;
   market?: MarketState;
+  /** Condition, injuries, suspensions and training progress per player (clubs of the career's league). */
+  fitness?: Record<string, PlayerStatus>;
+  training?: Training;
+  /** Last round whose fatigue, injuries and development have been applied. */
+  devRound?: number;
+  /** Player reports of played fixtures waiting for their round to be processed. */
+  reports?: Record<number, PlayerReport[]>;
 }
 
 export const seasonLabel = (season: number) => `${FIRST_YEAR + season - 1}/${String((FIRST_YEAR + season) % 100).padStart(2, '0')}`;
@@ -176,8 +185,13 @@ export function newCareer(coach: CareerCoach, clubId: string, seed: number): Car
     status: 'active',
     lastSummary: null,
     squads: {},
+    fitness: {},
+    training: { ...DEFAULT_TRAINING },
+    devRound: 0,
+    reports: {},
   };
   state.market = initMarket(state);
+  markSeasonStart(state);
   return state;
 }
 
@@ -230,7 +244,11 @@ export function otherFixtures(state: CareerState, round: number): Fixture[] {
 
 export function recordResult(state: CareerState, fixtureId: number, result: FixtureResult): void {
   const f = state.league.fixtures.find((x) => x.id === fixtureId);
-  if (f) f.result = result;
+  if (!f) return;
+  // The player report only lives until its round is processed (fatigue, injuries, cards).
+  const { report, ...rest } = result;
+  f.result = rest;
+  if (report) (state.reports ??= {})[fixtureId] = report;
 }
 
 export const seasonComplete = (state: CareerState) => nextRound(state.league) === null;
@@ -297,6 +315,7 @@ const ordinal = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 =
  */
 export function startNextSeason(state: CareerState, newClubId?: string): void {
   const rng = new Rng(state.seed * 7 + state.season * 104729);
+  seasonRollover(state);
   if (newClubId && newClubId !== state.clubId) {
     // Fresh start elsewhere after a sacking: the user's old club hires someone new.
     const free = COACHES.filter((c) => !Object.values(state.coaches).includes(c.id));
@@ -334,6 +353,7 @@ export function startNextSeason(state: CareerState, newClubId?: string): void {
   state.league = newSeason(state.league.clubs.map(clubById), (state.seed + state.season * 7919) >>> 0, state.league.leagueId);
   state.status = 'active';
   state.lastSummary = null;
+  markSeasonStart(state);
   state.news = state.news.slice(0, 30);
 }
 

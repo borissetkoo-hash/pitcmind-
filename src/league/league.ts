@@ -1,5 +1,6 @@
 import type { ClubData } from '../engine/types';
 import { Rng } from '../engine/rng';
+import type { PlayerReport } from '../engine/match';
 
 export interface GoalRecord {
   player: string;
@@ -11,6 +12,8 @@ export interface FixtureResult {
   score: [number, number];
   xg: [number, number];
   goals: GoalRecord[];
+  /** Per-player minutes, injuries and cards (career mode only; not kept in the table). */
+  report?: PlayerReport[];
 }
 
 export interface Fixture {

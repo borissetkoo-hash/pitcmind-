@@ -2,7 +2,8 @@ import type { Attributes, Role } from './types';
 
 type W = Partial<Record<keyof Attributes, number>>;
 
-const WEIGHTS: Record<Role, W> = {
+/** How much each attribute counts towards a position's overall rating. */
+export const WEIGHTS: Record<Role, W> = {
   GK: { goalkeeping: 6, positioning: 1.5, composure: 1, passing: 0.5 },
   CB: { tackling: 3, positioning: 3, heading: 2, pace: 1, composure: 1, passing: 0.7 },
   LB: { tackling: 2, positioning: 1.5, pace: 2, stamina: 1.5, passing: 1, dribbling: 0.6 },

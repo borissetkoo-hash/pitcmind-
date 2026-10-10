@@ -27,6 +27,9 @@ export const emptyTeamStats = (): TeamStats => ({
   tacklesWon: 0, interceptions: 0, fouls: 0, corners: 0, offsides: 0, yellows: 0, reds: 0, saves: 0,
 });
 
+/** Selection penalty for a player short of match fitness: rotation kicks in below ~90 %. */
+export const freshness = (condition = 1) => (condition >= 0.9 ? 1 : 1 - (0.9 - condition) * 0.8);
+
 /** Picks the strongest XI for a formation: greedy over slots, scarcest positions first. */
 export function pickLineup(players: PlayerData[], slots: Slot[]): { lineup: PlayerData[]; bench: PlayerData[] } {
   const remaining = [...players];
@@ -36,7 +39,7 @@ export function pickLineup(players: PlayerData[], slots: Slot[]): { lineup: Play
     let best = 0;
     let bestScore = -Infinity;
     remaining.forEach((p, idx) => {
-      const score = overall(p.attrs, s.role) * roleFit(p.position, s.role);
+      const score = overall(p.attrs, s.role) * roleFit(p.position, s.role) * freshness(p.condition);
       if (score > bestScore) {
         bestScore = score;
         best = idx;

@@ -13,6 +13,8 @@ export interface SideOverrides {
   /** Career rosters after transfers; the generated squad otherwise. */
   homePlayers?: PlayerData[];
   awayPlayers?: PlayerData[];
+  /** Also return each player's minutes, injuries and cards. */
+  report?: boolean;
 }
 
 /** Plays one fixture headlessly and condenses it to what the league needs. */
@@ -26,7 +28,9 @@ export function playFixture(home: string, away: string, seed: number, fast = tru
     homeTactics: o.homeTactics, awayTactics: o.awayTactics,
   });
   const r = m.runToEnd();
+  const report = o.report ? m.playerReport() : undefined;
   return {
+    ...(report ? { report } : {}),
     score: r.score,
     xg: [r.stats[0].xg, r.stats[1].xg],
     goals: r.events

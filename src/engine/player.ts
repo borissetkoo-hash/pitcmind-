@@ -56,6 +56,8 @@ export class Player {
   energy = 1;
   onPitch = true;
   sentOff = false;
+  /** Picked up an injury: limps on until the next stoppage, then is replaced. */
+  injured = false;
   yellow = 0;
   enteredAt = 0;
   leftAt: number | null = null;
@@ -81,6 +83,8 @@ export class Player {
     this.pos = { ...pos };
     this.prev = { ...pos };
     this.target = { ...pos };
+    // A tired squad player starts the match with less in the tank.
+    this.energy = 0.7 + 0.3 * Math.max(0, Math.min(1, data.condition ?? 1));
   }
 
   get a() {

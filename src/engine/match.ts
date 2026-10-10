@@ -22,7 +22,7 @@ export type Phase = 'restart' | 'play' | 'goal' | 'fulltime';
 
 export type EventType =
   | 'kickoff' | 'goal' | 'ownGoal' | 'shot' | 'save' | 'miss' | 'post' | 'blocked' | 'foul' | 'yellow' | 'red'
-  | 'corner' | 'offside' | 'sub' | 'halftime' | 'fulltime' | 'penalty' | 'penaltyMiss' | 'bigChance' | 'secondHalf';
+  | 'corner' | 'offside' | 'sub' | 'injury' | 'halftime' | 'fulltime' | 'penalty' | 'penaltyMiss' | 'bigChance' | 'secondHalf';
 
 export interface MatchEvent {
   id: number;
@@ -38,6 +38,16 @@ export interface MatchEvent {
 }
 
 export type ShotOutcome = 'pending' | 'goal' | 'saved' | 'blocked' | 'off' | 'post';
+
+/** What a match did to each player who took part (career mode: fatigue, injuries, suspensions). */
+export interface PlayerReport {
+  id: string;
+  minutes: number;
+  injured?: boolean;
+  yellows?: number;
+  /** 1: sent off for a second yellow, 2: straight red. */
+  red?: 1 | 2;
+}
 
 export interface ShotRecord {
   id: number;
@@ -116,6 +126,8 @@ export class Match {
   private readonly aiEvery: number;
   private readonly ticksPerSecond: number;
   readonly rng: Rng;
+  /** Separate stream for injuries, so they don't reshuffle every other random decision. */
+  private readonly injuryRng: Rng;
   readonly seed: number;
   readonly ball = new Ball();
   readonly teams: [Team, Team];
@@ -156,6 +168,7 @@ export class Match {
     this.ticksPerSecond = Math.round(1 / this.dt);
     this.seed = cfg.seed;
     this.rng = new Rng(cfg.seed);
+    this.injuryRng = new Rng((cfg.seed ^ 0x5bd1e995) >>> 0);
     const home = new Team(0, cfg.home, cfg.homeTactics ?? cfg.home.tactics, 1, cfg.homeCoach);
     const away = new Team(1, cfg.away, cfg.awayTactics ?? cfg.away.tactics, -1, cfg.awayCoach);
     home.opponent = away;
@@ -258,8 +271,69 @@ export class Match {
       this.stepPlay(dt);
     }
 
+    if (this.phase === 'play' && this.tick % this.ticksPerSecond === 0) this.checkInjuries();
     this.sampleStats();
     this.checkClock();
+  }
+
+  /**
+   * Non-contact injuries: a small risk every second of play, higher for tired legs and older bodies.
+   * About one injury every three or four matches per side, counting the ones from fouls.
+   */
+  private checkInjuries(): void {
+    for (const t of this.teams) {
+      for (const p of t.active) {
+        if (p.injured) continue;
+        const risk = 1.8e-6 * (1 + 3 * (1 - p.energy)) * (p.data.age > 30 ? 1.25 : 1) * (p.isGK ? 0.3 : 1);
+        if (this.injuryRng.chance(risk)) this.injure(p);
+      }
+    }
+  }
+
+  private injure(p: Player): void {
+    if (p.injured || !p.onPitch) return;
+    p.injured = true;
+    p.energy = Math.min(p.energy, 0.35);
+    this.emit('injury', p.team.index, p);
+  }
+
+  /** Injured players come off at the next stoppage; with no substitutions left the side plays a man short. */
+  private injurySubs(team: Team): void {
+    for (const p of team.active.filter((x) => x.injured)) {
+      const keeper = p.isGK;
+      const bench = team.bench.filter((b) => (keeper ? b.position === 'GK' : b.position !== 'GK'));
+      const pool = bench.length ? bench : team.bench;
+      p.onPitch = false;
+      p.leftAt = this.clock;
+      if (this.ball.owner === p) this.ball.owner = null;
+      if (team.subsLeft > 0 && pool.length) {
+        pool.sort((a, b) => overall(b.attrs, p.role) * roleFit(b.position, p.role) - overall(a.attrs, p.role) * roleFit(a.position, p.role));
+        const inData = pool[0];
+        team.bench = team.bench.filter((b) => b !== inData);
+        const np = new Player(inData, team, p.role, p.slot, { ...p.pos });
+        np.enteredAt = this.clock;
+        team.players.push(np);
+        team.subsLeft--;
+        this.emit('sub', team.index, np, p.data.name);
+      }
+      team.rosterChanged();
+    }
+  }
+
+  /** Minutes, injuries and cards per player — what the career needs after the final whistle. */
+  playerReport(): PlayerReport[] {
+    const out: PlayerReport[] = [];
+    for (const t of this.teams) {
+      for (const p of t.players) {
+        const minutes = Math.round(((p.leftAt ?? this.clock) - p.enteredAt) / 60);
+        const r: PlayerReport = { id: p.data.id, minutes: Math.max(0, Math.min(95, minutes)) };
+        if (p.injured) r.injured = true;
+        if (p.yellow && !p.sentOff) r.yellows = p.yellow;
+        if (p.sentOff) r.red = p.yellow >= 2 ? 1 : 2;
+        out.push(r);
+      }
+    }
+    return out;
   }
 
   private updateAI(): void {
@@ -565,6 +639,8 @@ export class Match {
     offender.stats.fouls++;
     offender.team.stats.fouls++;
     this.emit('foul', offender.team.index, offender, victim.data.name);
+    // Some fouls leave a mark: reckless tackles from behind most of all.
+    if (this.injuryRng.chance((0.006 + (fromBehind ? 0.009 : 0)) * (0.6 + offender.team.tactics.tackling * 0.8))) this.injure(victim);
     const vl = toLocal(victim.pos, victim.team.dir);
     const dangerous = vl.x > 75 && Math.abs(vl.y - MID_Y) < 22;
     // Denying an obvious goal-scoring opportunity: central, near goal, no covering defender.
@@ -950,6 +1026,7 @@ export class Match {
       p.dive = null;
       p.runTimer = 0;
     }
+    if (type !== 'penalty') for (const t of this.teams) this.injurySubs(t);
     if (type !== 'penalty' && type !== 'kickoff' && this.half === 2) {
       for (const t of this.teams) this.autoSubs(t);
     }
@@ -1038,7 +1115,7 @@ export class Match {
   private autoSubs(team: Team): void {
     if (team.subsLeft <= 0 || this.minute < 56) return;
     let made = 0;
-    const tired = team.active.filter((p) => !p.isGK && p.enteredAt === 0).sort((a, b) => a.energy - b.energy);
+    const tired = team.active.filter((p) => !p.isGK && !p.injured && p.enteredAt === 0).sort((a, b) => a.energy - b.energy);
     for (const p of tired) {
       if (made >= 2 || team.subsLeft <= 0) break;
       const late = this.minute >= 70 && this.rng.chance(0.25);

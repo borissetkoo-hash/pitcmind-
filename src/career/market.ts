@@ -6,6 +6,8 @@ import { Rng, hashString } from '../engine/rng';
 import { pickLineup } from '../engine/team';
 import { type ClubData, type PlayerData, ROLE_LINE, type Role } from '../engine/types';
 import type { CareerState } from './career';
+import { agedSquad } from './development';
+import { potential, rating } from './players';
 
 /**
  * Transfer market for the manager career.
@@ -65,18 +67,7 @@ const WEALTH: Record<string, number> = { eng: 1.35, esp: 1, ita: 0.95, ger: 1, b
 
 // ───────────────────────────── player valuation ──
 
-export const rating = (p: PlayerData) => overall(p.attrs, p.position);
-
-const unit = (s: string) => hashString(s) / 4294967296;
-
-/** Ceiling the player can grow to; young players have more headroom. */
-export function potential(p: PlayerData): number {
-  const u = unit(`pot-${p.id}`);
-  const r = rating(p);
-  const room = p.age <= 21 ? 4 + u * 14 : p.age <= 24 ? 2 + u * 8 : p.age <= 27 ? u * 4 : 0;
-  // The closer to the top of the scale, the less room is left.
-  return Math.min(99, r + Math.round(room * Math.min(1, (99 - r) / 25)));
-}
+export { potential, rating } from './players';
 
 const ageFactor = (age: number) => (age <= 21 ? 1.25 : age <= 24 ? 1.15 : age <= 27 ? 1 : age <= 29 ? 0.8 : age <= 31 ? 0.55 : age <= 33 ? 0.35 : 0.2);
 const baseValue = (r: number) => 2 * Math.exp(0.14 * (r - 70));
@@ -100,16 +91,15 @@ export const fmtWage = (k: number) => `€${k}K`;
 // ───────────────────────────── squads ──
 
 export function squadOf(state: CareerState, clubId: string): PlayerData[] {
-  return state.squads?.[clubId] ?? clubById(clubId).players;
+  return state.squads?.[clubId] ?? agedSquad(state, clubId);
 }
 
 /** A club as the engine needs it, with its current career roster. */
 export function clubFor(state: CareerState, clubId: string): ClubData {
-  const players = state.squads?.[clubId];
-  return players ? { ...clubById(clubId), players } : clubById(clubId);
+  return { ...clubById(clubId), players: squadOf(state, clubId) };
 }
 
-function setSquad(state: CareerState, clubId: string, players: PlayerData[]): void {
+export function setSquad(state: CareerState, clubId: string, players: PlayerData[]): void {
   state.squads ??= {};
   state.squads[clubId] = players;
 }

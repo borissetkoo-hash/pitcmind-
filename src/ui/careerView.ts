@@ -24,8 +24,9 @@ import {
   userPosition,
 } from '../career/career';
 import { deleteCareer, loadCareer, saveCareer } from '../career/storage';
-import { clubFor, ensureMarket, fmtMoney, marketTick, transferWindow } from '../career/market';
-import { renderMarketTab, renderSquadTab } from './transfersUi';
+import { ensureMarket, fmtMoney, marketTick, transferWindow } from '../career/market';
+import { readinessHtml, renderMarketTab, renderSquadTab } from './transfersUi';
+import { completeRound, matchClub, matchSquad, processRounds } from '../career/development';
 import { LEAGUES } from '../data/clubSeeds';
 import { clubById, leagueClubs } from '../data/clubs';
 import { leagueName, leagueTabsHtml } from './leagueUi';
@@ -121,7 +122,7 @@ function overridesFor(state: CareerState, f: Fixture) {
   const a = clubSide(state, f.away);
   return {
     homeCoach: h.coach.traits, awayCoach: a.coach.traits, homeTactics: h.tactics, awayTactics: a.tactics,
-    homePlayers: state.squads?.[f.home], awayPlayers: state.squads?.[f.away],
+    homePlayers: matchSquad(state, f.home), awayPlayers: matchSquad(state, f.away), report: true,
   };
 }
 
@@ -138,7 +139,7 @@ async function catchUp(state: CareerState, onProgress: () => void): Promise<void
   const pool = sharedPool();
   await Promise.all(
     pending.map(async (f) => {
-      f.result = await pool.run({ id: f.id, home: f.home, away: f.away, seed: f.seed, overrides: overridesFor(state, f) });
+      recordResult(state, f.id, await pool.run({ id: f.id, home: f.home, away: f.away, seed: f.seed, overrides: overridesFor(state, f) }));
       onProgress();
     }),
   );
@@ -156,6 +157,9 @@ export function renderCareer(root: HTMLElement, deps: CareerDeps): void {
 
 function showCareer(root: HTMLElement, state: CareerState, deps: CareerDeps): void {
   ensureMarket(state);
+  // Saves from before player condition existed start tracking from the current round.
+  state.devRound ??= completeRound(state);
+  processRounds(state);
   if (state.status === 'active' && seasonComplete(state)) {
     endSeason(state);
     saveCareer(state);
@@ -421,7 +425,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
           const oppId = homeGame ? f.away : f.home;
           const opp = clubById(oppId);
           const oc = clubSide(state, oppId).coach;
-          const st = strength(clubFor(state, oppId), clubSide(state, oppId).tactics.formation);
+          const st = strength(matchClub(state, oppId), clubSide(state, oppId).tactics.formation);
           return `<section class="panel next-match">
             <div class="card-title"><h3>${l.nextMatch}</h3><span class="muted">${l.round} ${f.round}/${Math.max(...state.league.fixtures.map((x) => x.round))} · ${homeGame ? l.home : l.away}</span></div>
             <div class="versus">
@@ -430,6 +434,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
               <div class="vs-side">${crestHtml(opp, 44)}<b>${esc(opp.name)}</b><span class="muted num">OVR ${st.ovr}</span></div>
             </div>
             <div class="opp-coach">${coachAvatar(oc, 48)}<div><span class="muted">${l.opponentCoach}</span><div><b>${esc(coachName(oc))}</b> · <span class="chip">${oc.formations[0]}</span></div><p>${esc(oc.style[lang])}</p></div></div>
+            ${readinessHtml(state)}
             <div class="next-actions">
               <button class="btn" type="button" id="tacticsBtn" aria-expanded="${showTactics}">${showTactics ? l.hideTactics : l.tactics} · <span class="num">${state.tactics.formation}</span></button>
               <span class="sep"></span>
@@ -548,6 +553,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
     busy = true;
     draw();
     await catchUp(state, () => root.isConnected && draw());
+    processRounds(state);
     marketTick(state);
     busy = false;
     saveCareer(state);
@@ -572,14 +578,15 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
     const h = clubSide(state, f.home);
     const a = clubSide(state, f.away);
     const setup: MatchSetup = {
-      home: clubFor(state, f.home), away: clubFor(state, f.away), homeTactics: h.tactics, awayTactics: a.tactics,
+      home: matchClub(state, f.home), away: matchClub(state, f.away), homeTactics: h.tactics, awayTactics: a.tactics,
       homeCoach: h.coach, awayCoach: a.coach, seed: f.seed,
     };
     deps.playLive(setup, f.home === state.clubId ? 0 : 1, (m) => {
-      recordResult(state, f.id, matchToResult(m, f));
+      recordResult(state, f.id, { ...matchToResult(m, f), report: m.playerReport() });
       saveCareer(state);
       // The rest of the round plays in the background while the report is on screen.
       void catchUp(state, () => undefined).then(() => {
+        processRounds(state);
         marketTick(state);
         saveCareer(state);
       });

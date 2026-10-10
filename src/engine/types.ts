@@ -33,6 +33,10 @@ export interface PlayerData {
   position: Role;
   age: number;
   attrs: Attributes;
+  /** Match fitness at kick-off, 0 … 1 (career mode; fresh when absent). */
+  condition?: number;
+  /** Ability ceiling (career mode); derived from age and a per-player roll when absent. */
+  potential?: number;
 }
 
 export type FormationId = '4-4-2' | '4-3-3' | '4-2-3-1' | '3-5-2' | '5-3-2' | '4-1-4-1' | '3-4-3' | '3-4-2-1';

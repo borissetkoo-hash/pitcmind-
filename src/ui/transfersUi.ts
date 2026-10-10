@@ -4,7 +4,10 @@ import {
   fmtWage, isLoanedIn, lineOf, listPlayer, loanFee, loanIn, loanOut, loanable, marketValue, potential, rating, rejectOffer,
   squadOf, transferWindow, wageBill, wageDemand, wageOf, willingToJoin,
 } from '../career/market';
+import { DEFAULT_TRAINING, type Focus, INJURIES, type Intensity, absence, matchSquad, statusOf } from '../career/development';
 import { LEAGUES, leagueOf } from '../data/clubSeeds';
+import { FORMATIONS } from '../engine/formations';
+import { pickLineup } from '../engine/team';
 import { CLUBS, clubById } from '../data/clubs';
 import { crestHtml } from '../data/clubCustom';
 import { overall } from '../engine/attributes';
@@ -34,6 +37,20 @@ const L = {
     } as Record<DealError, string>,
     marketTitle: 'Трансферный рынок', marketSub: 'Игроки всех лиг. Нажмите на игрока, чтобы сравнить его с вашим составом и сделать предложение.',
     recent: 'Последние трансферы', loanTag: 'аренда', none: 'Ничего не найдено.',
+    cond: 'Форма', condFull: 'Физическое состояние', apps: 'Матчей', injured: 'Травма', banned: 'Дисквалификация', matches: (n: number) => `${n} ${n === 1 ? 'матч' : n < 5 ? 'матча' : 'матчей'}`,
+    yellows: 'Жёлтых до дисквалификации', seasonGrowth: 'Рост за сезон', training: 'Тренировки', intensity: 'Нагрузка', focus: 'Акцент',
+    int: { low: 'Лёгкая', normal: 'Обычная', high: 'Интенсивная' } as Record<Intensity, string>,
+    foc: { balanced: 'Баланс', attack: 'Атака', defence: 'Оборона', physical: 'Физика' } as Record<Focus, string>,
+    intHint: {
+      low: 'Игроки быстрее восстанавливаются и реже травмируются, но прогрессируют медленнее.',
+      normal: 'Сбалансированная нагрузка: обычное восстановление и рост.',
+      high: 'Молодые растут быстрее (+30%), но восстановление медленнее и выше риск травм на тренировках.',
+    } as Record<Intensity, string>,
+    focHint: {
+      balanced: 'Растут атрибуты, важные для позиции игрока.', attack: 'Удар, дриблинг, первое касание, хладнокровие, видение поля.',
+      defence: 'Отбор, позиционирование, игра головой.', physical: 'Скорость, ускорение, выносливость; ветераны теряют форму медленнее.',
+    } as Record<Focus, string>,
+    readiness: 'Готовность состава', xiCond: 'Свежесть основы', out: 'Не сыграют', allFit: 'Все игроки доступны.',
   },
   en: {
     budget: 'Transfer budget', wages: 'Weekly wages', squad: 'Squad size', windowOpen: (k: string, n: number) => `${k === 'winter' ? 'Winter' : 'Summer'} transfer window open · closes in ${n} round${n === 1 ? '' : 's'}`,
@@ -54,6 +71,20 @@ const L = {
     } as Record<DealError, string>,
     marketTitle: 'Transfer market', marketSub: 'Players from every league. Tap a player to compare him with your squad and make an offer.',
     recent: 'Recent transfers', loanTag: 'loan', none: 'Nothing found.',
+    cond: 'Cond', condFull: 'Condition', apps: 'Apps', injured: 'Injury', banned: 'Suspended', matches: (n: number) => `${n} match${n === 1 ? '' : 'es'}`,
+    yellows: 'Yellows towards a ban', seasonGrowth: 'Progress this season', training: 'Training', intensity: 'Intensity', focus: 'Focus',
+    int: { low: 'Light', normal: 'Normal', high: 'Intense' } as Record<Intensity, string>,
+    foc: { balanced: 'Balanced', attack: 'Attack', defence: 'Defence', physical: 'Physical' } as Record<Focus, string>,
+    intHint: {
+      low: 'Players recover faster and get injured less, but develop more slowly.',
+      normal: 'Balanced load: normal recovery and development.',
+      high: 'Young players develop faster (+30%), but recovery is slower and training injuries more likely.',
+    } as Record<Intensity, string>,
+    focHint: {
+      balanced: 'Develops the attributes that matter for each player’s position.', attack: 'Shooting, dribbling, first touch, composure, vision.',
+      defence: 'Tackling, positioning, heading.', physical: 'Pace, acceleration, stamina; veterans decline more slowly.',
+    } as Record<Focus, string>,
+    readiness: 'Squad readiness', xiCond: 'Starting XI freshness', out: 'Unavailable', allFit: 'Everyone is available.',
   },
 };
 const tr = () => L[getLang()];
@@ -107,9 +138,9 @@ export function financeStrip(state: CareerState): string {
   </section>`;
 }
 
-function playerRow(p: PlayerData, first: string, extra: string, cols: string, open: boolean): string {
+function playerRow(p: PlayerData, first: string, extra: string, cols: string, open: boolean, cls = ''): string {
   const r = rating(p);
-  return `<button type="button" class="prow ${open ? 'open' : ''}" data-pid="${esc(p.id)}" aria-expanded="${open}">
+  return `<button type="button" class="prow ${open ? 'open' : ''} ${cls}" data-pid="${esc(p.id)}" aria-expanded="${open}">
     <span class="pnum num">${first}</span>
     <span class="pname"><b>${esc(p.name)}</b>${extra}</span>
     <span class="ppos">${roleLabel(p.position)}</span>
@@ -118,6 +149,59 @@ function playerRow(p: PlayerData, first: string, extra: string, cols: string, op
     <span class="num muted pcol">${potential(p)}</span>
     ${cols}
   </button>`;
+}
+
+const condClass = (c: number) => (c >= 85 ? 'good' : c >= 70 ? 'mid' : 'bad');
+
+function condCell(c: number): string {
+  const v = Math.round(c);
+  return `<span class="cond" title="${tr().condFull}: ${v}%"><i class="${condClass(v)}" style="width:${v}%"></i><b class="num">${v}</b></span>`;
+}
+
+/** Injury, suspension and development badges for a squad row. */
+function statusTags(state: CareerState, p: PlayerData): string {
+  const l = tr();
+  const s = statusOf(state, p.id);
+  let out = '';
+  if (s.inj) out += `<span class="tag inj" title="${esc(INJURIES[s.inj.k][getLang()])}">✚ ${s.inj.r}</span>`;
+  if (s.ban) out += `<span class="tag ban" title="${l.banned}">▮ ${s.ban}</span>`;
+  const d = s.r0 !== undefined ? rating(p) - s.r0 : 0;
+  if (d) out += `<span class="tag ${d > 0 ? 'grow' : 'fall'}" title="${l.seasonGrowth}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`;
+  return out;
+}
+
+/** Next-match readiness: freshness of the likely XI and who is missing. */
+export function readinessHtml(state: CareerState): string {
+  const l = tr();
+  const lang = getLang();
+  const fit = matchSquad(state, state.clubId);
+  const { lineup } = pickLineup(fit, FORMATIONS[state.tactics.formation]);
+  const avg = Math.round((lineup.reduce((a, p) => a + (p.condition ?? 1), 0) / lineup.length) * 100);
+  const out = squadOf(state, state.clubId).filter((p) => absence(state, p.id));
+  return `<div class="readiness">
+    <div class="meter-label"><span>${l.xiCond}</span><b class="num">${avg}%</b></div>
+    <div class="meter ${condClass(avg)}"><i style="width:${avg}%"></i></div>
+    <div class="muted">${out.length
+      ? `${l.out}: ${out
+          .map((p) => {
+            const s = statusOf(state, p.id);
+            return `<b>${esc(p.name)}</b> (${s.inj ? `${esc(INJURIES[s.inj.k][lang].toLowerCase())}, ${l.matches(s.inj.r)}` : `${l.banned.toLowerCase()}, ${l.matches(s.ban!)}`})`;
+          })
+          .join(', ')}`
+      : l.allFit}</div>
+  </div>`;
+}
+
+function trainingPanel(state: CareerState): string {
+  const l = tr();
+  const t = state.training ?? DEFAULT_TRAINING;
+  const seg = (name: string, keys: string[], cur: string, labels: Record<string, string>) =>
+    `<div class="seg" role="group" aria-label="${name}">${keys.map((k) => `<button type="button" data-${name}="${k}" aria-pressed="${cur === k}">${labels[k]}</button>`).join('')}</div>`;
+  return `<section class="panel pad training">
+    <div class="card-title"><h3>${l.training}</h3></div>
+    <div class="train-row"><span class="muted">${l.intensity}</span>${seg('intensity', ['low', 'normal', 'high'], t.intensity, l.int)}<p class="muted">${l.intHint[t.intensity]}</p></div>
+    <div class="train-row"><span class="muted">${l.focus}</span>${seg('focus', ['balanced', 'attack', 'defence', 'physical'], t.focus, l.foc)}<p class="muted">${l.focHint[t.focus]}</p></div>
+  </section>`;
 }
 
 function attrsHtml(p: PlayerData, vs?: PlayerData): string {
@@ -150,21 +234,32 @@ export function renderSquadTab(box: HTMLElement, state: CareerState, changed: ()
     })
     .join('');
 
-  box.innerHTML = `${financeStrip(state)}
+  box.innerHTML = `${trainingPanel(state)}
+    ${financeStrip(state)}
     <section class="panel pad"><div class="card-title"><h3>${l.offers}</h3></div>${offers || `<p class="muted">${l.noOffers}</p>`}</section>
     ${squadUi.msg ? `<p class="deal-msg" role="status">${esc(squadUi.msg)}</p>` : ''}
     <section class="panel pad">
       <div class="card-title">${lineSeg(squadUi.line)}</div>
       <div class="plist">
-        <div class="prow head"><span>#</span><span>${l.name}</span><span>${l.pos}</span><span>${l.age}</span><span>${l.ovr}</span><span class="pcol">${l.pot}</span><span>${l.value}</span><span class="wcol">${l.wage}</span></div>
+        <div class="prow head"><span>#</span><span>${l.name}</span><span>${l.pos}</span><span>${l.age}</span><span>${l.ovr}</span><span class="pcol">${l.pot}</span><span>${l.cond}</span><span class="wcol">${l.value}</span></div>
         ${squad
           .map((p) => {
             const listed = m.listed[p.id];
             const loan = isLoanedIn(state, p.id);
-            const tags = `${listed !== undefined ? `<span class="tag sell">${l.listed} ${fmtMoney(listed)}</span>` : ''}${loan ? `<span class="tag loan">${l.onLoan}</span>` : ''}`;
-            const row = playerRow(p, String(p.number), tags, `<span class="num">${fmtMoney(marketValue(p))}</span><span class="num muted wcol">${fmtWage(wageOf(p))}</span>`, squadUi.open === p.id);
+            const st = statusOf(state, p.id);
+            const tags = `${statusTags(state, p)}${listed !== undefined ? `<span class="tag sell">${l.listed} ${fmtMoney(listed)}</span>` : ''}${loan ? `<span class="tag loan">${l.onLoan}</span>` : ''}`;
+            const row = playerRow(p, String(p.number), tags, `${condCell(st.c)}<span class="num wcol">${fmtMoney(marketValue(p))}</span>`, squadUi.open === p.id, absence(state, p.id) ? 'out' : '');
             if (squadUi.open !== p.id) return row;
-            return `${row}<div class="pdetail">${attrsHtml(p)}
+            const facts = [
+              `${l.condFull}: <b class="num">${Math.round(st.c)}%</b>`,
+              st.inj ? `<span class="risk">${l.injured}: ${esc(INJURIES[st.inj.k][getLang()])}, ${l.matches(st.inj.r)}</span>` : '',
+              st.ban ? `<span class="risk">${l.banned}: ${l.matches(st.ban)}</span>` : '',
+              `${l.apps}: <b class="num">${st.apps ?? 0}</b>`,
+              `${l.yellows}: <b class="num">${st.yc ?? 0}/5</b>`,
+              st.r0 !== undefined ? `${l.seasonGrowth}: <b class="num">${st.r0} → ${rating(p)}</b>` : '',
+              `${l.value}: <b class="num">${fmtMoney(marketValue(p))}</b> · ${l.wage}: <b class="num">${fmtWage(wageOf(p))}</b>`,
+            ].filter(Boolean);
+            return `${row}<div class="pdetail"><div class="pfacts">${facts.map((f) => `<span>${f}</span>`).join('')}</div>${attrsHtml(p)}
               ${loan
                 ? ''
                 : `<div class="deal">${listed !== undefined
@@ -181,6 +276,15 @@ export function renderSquadTab(box: HTMLElement, state: CareerState, changed: ()
     squadUi.msg = msg;
     changed();
   };
+  box.querySelectorAll<HTMLButtonElement>('[data-intensity],[data-focus]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const t = { ...(state.training ?? DEFAULT_TRAINING) };
+      if (b.dataset.intensity) t.intensity = b.dataset.intensity as Intensity;
+      if (b.dataset.focus) t.focus = b.dataset.focus as Focus;
+      state.training = t;
+      redraw();
+    }),
+  );
   box.querySelectorAll<HTMLButtonElement>('[data-line]').forEach((b) =>
     b.addEventListener('click', () => {
       squadUi.line = b.dataset.line as Line | 'all';

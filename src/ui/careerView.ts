@@ -23,7 +23,7 @@ import {
   startNextSeason,
   userPosition,
 } from '../career/career';
-import { deleteCareer, loadCareer, saveCareer } from '../career/storage';
+import { type CloudStatus, cloudStatus, deleteCareer, loadCareer, onCloudStatus, saveCareer } from '../career/storage';
 import { ensureMarket, fmtMoney, marketTick, transferWindow } from '../career/market';
 import { readinessHtml, renderMarketTab, renderSquadTab } from './transfersUi';
 import { completeRound, matchClub, matchSquad, processRounds } from '../career/development';
@@ -60,6 +60,8 @@ const L = {
     seasonOver: 'Сезон завершён', finished: 'Итоговое место', verdictMet: 'Правление довольно: задача выполнена.', verdictMissed: 'Задача не выполнена — доверие правления падает.',
     champion: 'Чемпион!', growth: 'Рост атрибутов', noGrowth: 'Атрибуты без изменений', startNext: 'Начать сезон', sacked: 'Вас уволили',
     sackedSub: 'Правление потеряло доверие. Есть предложения от клубов поскромнее:', accept: 'Принять предложение', newCareerBtn: 'Начать новую карьеру',
+    loadFailed: 'Не удалось открыть карьеру', loadFailedSub: 'Сохранение на месте. Попробуйте ещё раз; если ошибка повторится, пришлите её текст.', retry: 'Попробовать снова',
+    cloudSaved: 'Сохранено в облаке и в браузере.', cloudSaving: 'Сохранение в облако…', cloudError: 'Облако не приняло сохранение — прогресс сохранён в этом браузере.', cloudTooBig: 'Сохранение слишком большое для облака — хранится в этом браузере.',
     tabOverview: 'Обзор', tabSquad: 'Состав', tabMarket: 'Трансферы', budgetShort: 'Бюджет', prize: 'Призовые', budgetNow: 'трансферный бюджет',
     w: 'В', d: 'Н', l: 'П', titles: 'Титулы', goals: 'Мячи', pos: 'Место', pts: 'О', saved: 'Прогресс сохраняется автоматически.',
     tgt: (n: number) => (n === 1 ? 'чемпионство' : n >= 7 ? 'не занять последнее место' : `топ-${n}`),
@@ -84,6 +86,8 @@ const L = {
     seasonOver: 'Season over', finished: 'Final position', verdictMet: 'The board is satisfied: objective met.', verdictMissed: 'Objective missed — the board’s confidence drops.',
     champion: 'Champions!', growth: 'Attribute growth', noGrowth: 'No attribute changes', startNext: 'Start season', sacked: 'You have been sacked',
     sackedSub: 'The board has lost confidence. Smaller clubs have made offers:', accept: 'Accept offer', newCareerBtn: 'Start a new career',
+    loadFailed: 'Couldn’t open the career', loadFailedSub: 'The save is still there. Try again; if it keeps failing, send the error text.', retry: 'Try again',
+    cloudSaved: 'Saved to the cloud and this browser.', cloudSaving: 'Saving to the cloud…', cloudError: 'The cloud refused the save — progress is kept in this browser.', cloudTooBig: 'The save is too big for the cloud — kept in this browser.',
     tabOverview: 'Overview', tabSquad: 'Squad', tabMarket: 'Transfers', budgetShort: 'Budget', prize: 'Prize money', budgetNow: 'transfer budget',
     w: 'W', d: 'D', l: 'L', titles: 'Titles', goals: 'Goals', pos: 'Pos', pts: 'Pts', saved: 'Progress saves automatically.',
     tgt: (n: number) => (n === 1 ? 'win the title' : n >= 7 ? 'avoid finishing bottom' : `top ${n}`),
@@ -148,12 +152,39 @@ async function catchUp(state: CareerState, onProgress: () => void): Promise<void
 
 export function renderCareer(root: HTMLElement, deps: CareerDeps): void {
   root.innerHTML = `<p class="muted" style="padding:40px 0">${tr().loading}</p>`;
-  void Promise.all([loadCareer(), loadFaces()]).then(([state]) => {
+  // Imported faces are a nicety: never let a slow or blocked IndexedDB hold the career back.
+  const faces = Promise.race([loadFaces().catch(() => undefined), new Promise((r) => setTimeout(r, 800))]);
+  void Promise.all([loadCareer().catch(() => null), faces]).then(([state]) => {
     if (!root.isConnected) return;
-    if (state) showCareer(root, state, deps);
-    else renderCreator(root, deps);
+    try {
+      if (state) showCareer(root, state, deps);
+      else renderCreator(root, deps);
+    } catch (e) {
+      console.error(e);
+      renderLoadError(root, deps, e);
+    }
   });
 }
+
+/** A save that can't be opened: say so, offer a retry and a clean start instead of a blank screen. */
+function renderLoadError(root: HTMLElement, deps: CareerDeps, e: unknown): void {
+  const l = tr();
+  root.innerHTML = `<section class="panel season-end">
+    <h3>${l.loadFailed}</h3><p class="muted">${l.loadFailedSub}</p>
+    <code class="muted" style="font-size:12px;word-break:break-word">${esc(String((e as Error)?.message ?? e))}</code>
+    <div class="next-actions"><button class="btn primary" type="button" id="retry">${l.retry}</button><button class="btn danger" type="button" id="wipe">${l.newCareerBtn}</button></div>
+  </section>`;
+  root.querySelector('#retry')!.addEventListener('click', () => renderCareer(root, deps));
+  root.querySelector('#wipe')!.addEventListener('click', () => {
+    deleteCareer();
+    renderCreator(root, deps);
+  });
+}
+
+const cloudText = (s: CloudStatus) => {
+  const l = tr();
+  return s === 'saved' ? `☁ ${l.cloudSaved}` : s === 'saving' ? `☁ ${l.cloudSaving}` : s === 'error' ? `⚠ ${l.cloudError}` : s === 'tooBig' ? `⚠ ${l.cloudTooBig}` : l.saved;
+};
 
 function showCareer(root: HTMLElement, state: CareerState, deps: CareerDeps): void {
   ensureMarket(state);
@@ -496,7 +527,7 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
           <section class="panel pad danger-zone">
             ${confirmDelete
               ? `<p>${l.confirmDelete}</p><div class="next-actions"><button class="btn" type="button" id="cancelDel">${l.cancel}</button><button class="btn danger" type="button" id="yesDel">${l.yesDelete}</button></div>`
-              : `<p class="muted">${l.saved}</p><button class="btn small" type="button" id="delete">${l.deleteCareer}</button>`}
+              : `<p class="muted" id="cloudState">${cloudText(cloudStatus())}</p><button class="btn small" type="button" id="delete">${l.deleteCareer}</button>`}
           </section>
         </aside>
       </div>`}`;
@@ -534,6 +565,10 @@ function renderHub(root: HTMLElement, state: CareerState, deps: CareerDeps): voi
     });
     root.querySelector('#quick')?.addEventListener('click', () => void quick());
     root.querySelector('#live')?.addEventListener('click', () => live());
+    onCloudStatus((st) => {
+      const el = root.querySelector('#cloudState');
+      if (el) el.textContent = cloudText(st);
+    });
     root.querySelector('#delete')?.addEventListener('click', () => {
       confirmDelete = true;
       draw();

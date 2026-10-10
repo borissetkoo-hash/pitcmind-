@@ -4,7 +4,16 @@ import { Match } from '../engine/match';
 import { t } from '../i18n';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const frame = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+/** Next animation frame — or a short timer when frames are throttled (hidden or sandboxed page). */
+const frame = () => new Promise((r) => {
+  const t = setTimeout(() => r(null), 50);
+  requestAnimationFrame(() => {
+    clearTimeout(t);
+    r(null);
+  });
+});
+/** Optional work never holds the loading screen longer than `ms`. */
+const capped = (p: unknown, ms: number) => Promise.race([Promise.resolve(p).catch(() => undefined), wait(ms)]);
 
 /**
  * Splash screen with a loading bar. The steps do real work (fonts, squads, warming up the
@@ -22,6 +31,8 @@ export async function bootScreen(): Promise<void> {
     </div>
     <div class="boot-pitch" aria-hidden="true"></div>`;
   document.body.appendChild(el);
+  // Whatever happens below, the game is never left behind the loading screen.
+  const failsafe = setTimeout(() => el.remove(), 8000);
   const bar = el.querySelector<HTMLElement>('.boot-bar i')!;
   const status = el.querySelector<HTMLElement>('.boot-status')!;
   const pct = el.querySelector<HTMLElement>('.boot-pct')!;
@@ -45,7 +56,7 @@ export async function bootScreen(): Promise<void> {
   };
 
   const steps: [string, number, number, () => unknown][] = [
-    [t('bootFonts'), 18, 450, () => Promise.all([document.fonts?.ready, loadFaces()])],
+    [t('bootFonts'), 18, 450, () => capped(Promise.all([document.fonts?.ready, loadFaces()]), 1200)],
     [t('bootClubs'), 42, 550, () => CLUBS.reduce((n, c) => n + c.players.length, 0)],
     [t('bootEngine'), 78, 700, () => {
       // Warm up the engine (JIT) with a few seconds of a throwaway match.
@@ -62,5 +73,6 @@ export async function bootScreen(): Promise<void> {
   await wait(250);
   el.classList.add('done');
   await wait(450);
+  clearTimeout(failsafe);
   el.remove();
 }

@@ -19,9 +19,12 @@ export class SimPool {
     try {
       for (let i = 0; i < size; i++) {
         const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+        // A worker that fails to load (blocked script, sandbox) hands everything to the main thread.
+        w.onerror = () => this.fallBack();
         w.onmessage = (ev: MessageEvent<{ id: number; result: FixtureResult }>) => {
           const done = this.busy.get(w);
           this.busy.delete(w);
+          this.inFlight.delete(w);
           done?.(ev.data.result);
           this.pump();
         };
@@ -42,12 +45,26 @@ export class SimPool {
     });
   }
 
+  private inFlight = new Map<Worker, SimRequest>();
+
+  private fallBack(): void {
+    const pending = [...this.inFlight.entries()].map(([w, req]) => ({ req, resolve: this.busy.get(w)! }));
+    for (const w of this.workers) w.terminate();
+    this.workers = [];
+    this.busy.clear();
+    this.inFlight.clear();
+    for (const job of [...pending, ...this.queue.splice(0)]) {
+      setTimeout(() => job.resolve(playFixture(job.req.home, job.req.away, job.req.seed, true, job.req.overrides)), 0);
+    }
+  }
+
   private pump(): void {
     for (const w of this.workers) {
       if (this.busy.has(w)) continue;
       const job = this.queue.shift();
       if (!job) return;
       this.busy.set(w, job.resolve);
+      this.inFlight.set(w, job.req);
       w.postMessage(job.req);
     }
   }

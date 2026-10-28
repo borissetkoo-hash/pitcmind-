@@ -31,7 +31,7 @@ const L = {
     done: (f: string) => `Сделка завершена: ${f}.`, loanDone: 'Аренда оформлена.', loanedTo: (c: string) => `Игрок отправлен в аренду в «${c}».`,
     counter: (f: string) => `Предложение отклонено. Клуб готов отдать игрока за ${f}.`, sold: (f: string) => `Игрок продан за ${f}.`,
     err: {
-      closed: 'Трансферное окно закрыто.', budget: 'Не хватает трансферного бюджета.', wages: 'Зарплата не помещается в зарплатную ведомость.',
+      banned: 'Клубу запрещено регистрировать новых игроков (санкция УЕФА).', closed: 'Трансферное окно закрыто.', budget: 'Не хватает трансферного бюджета.', wages: 'Зарплата не помещается в зарплатную ведомость.',
       squadFull: `В составе уже ${SQUAD_MAX} игроков.`, squadMin: `В составе должно остаться не меньше ${SQUAD_MIN} игроков.`, unwilling: 'Игрок не хочет переходить в ваш клуб.',
       rejected: 'Предложение отклонено.', patience: 'Клуб больше не хочет вести переговоры в этом окне.', notLoanable: 'Игрок недоступен для аренды.', own: 'Это ваш игрок.',
     } as Record<DealError, string>,
@@ -65,7 +65,7 @@ const L = {
     done: (f: string) => `Deal done: ${f}.`, loanDone: 'Loan agreed.', loanedTo: (c: string) => `Player loaned out to ${c}.`,
     counter: (f: string) => `Offer rejected. The club would sell for ${f}.`, sold: (f: string) => `Player sold for ${f}.`,
     err: {
-      closed: 'The transfer window is shut.', budget: 'Not enough transfer budget.', wages: 'The wage doesn’t fit the wage budget.',
+      banned: 'The club is banned from registering new players (UEFA sanction).', closed: 'The transfer window is shut.', budget: 'Not enough transfer budget.', wages: 'The wage doesn’t fit the wage budget.',
       squadFull: `The squad already has ${SQUAD_MAX} players.`, squadMin: `At least ${SQUAD_MIN} players must remain in the squad.`, unwilling: 'The player doesn’t want to join your club.',
       rejected: 'Offer rejected.', patience: 'The club won’t negotiate again in this window.', notLoanable: 'The player isn’t available on loan.', own: 'He’s your player.',
     } as Record<DealError, string>,

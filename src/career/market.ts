@@ -58,6 +58,8 @@ export interface MarketState {
   tickRound: number;
   /** Wage scale the wage budget was set in (saves before 2 used wages four times lower). */
   wageScale?: number;
+  /** A registration ban (owner mode sanction): no new players up to and including this season. */
+  banUntil?: number;
 }
 
 export const SQUAD_MIN = 16;
@@ -237,7 +239,7 @@ export function transferWindow(state: CareerState): WindowInfo {
 
 // ───────────────────────────── buying ──
 
-export type DealError = 'closed' | 'budget' | 'wages' | 'squadFull' | 'squadMin' | 'unwilling' | 'rejected' | 'patience' | 'notLoanable' | 'own';
+export type DealError = 'banned' | 'closed' | 'budget' | 'wages' | 'squadFull' | 'squadMin' | 'unwilling' | 'rejected' | 'patience' | 'notLoanable' | 'own';
 
 export type DealResult = { ok: true; fee: number } | { ok: false; reason: DealError; counter?: number };
 
@@ -264,6 +266,7 @@ export const wageDemand = (p: PlayerData) => Math.round(wageOf(p) * 1.1);
 
 function checkSigning(state: CareerState, p: PlayerData, wage: number): DealError | null {
   const m = ensureMarket(state);
+  if ((m.banUntil ?? 0) >= state.season) return 'banned';
   if (!transferWindow(state).open) return 'closed';
   if (squadOf(state, state.clubId).length >= SQUAD_MAX) return 'squadFull';
   if (wageBill(state) + wage > m.wageBudget) return 'wages';

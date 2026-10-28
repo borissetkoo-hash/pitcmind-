@@ -14,10 +14,14 @@ import {
   ARCHETYPE_IDS, ARCHETYPES, type Archetype, COST_KEYS, FACILITIES, FACILITY_KINDS, type FacilityKind, INCOME_KEYS, type LedgerKey,
   type OwnerState, type OwnerSummary, type StaffRole, type Strategy, type TicketPolicy, annualCosts, annualIncome, attendance, borrow, build,
   chooseSponsor, clubValuation, coachCandidates, coachRep, coachWage, coachWilling, currentPosition, dividend, effectiveRate, facilityCost,
-  fireCoach, fireStaff, hireCoach, hireStaff, injectCapital, listing, loanRoom, maxLoan, money, netWorth, newOwnerCareer, ownerNextSeason,
-  ownerSeasonEnd, repay, reservePrice, sellClub, setTransferBudget, staffCandidates, staffWilling,
+  fireCoach, fireStaff, hireCoach, hireStaff, injectCapital, listing, loanRoom, maxLoan, money, netWorth, newOwnerCareer, repay, reservePrice, sellClub, setTransferBudget, staffCandidates, staffWilling,
 } from '../owner/owner';
-import { afterOwnerRound, blocker, ownerSave, playOwnerRound } from '../owner/play';
+import { afterOwnerRound, blocker, finishOwnerSeason, ownerSave, playOwnerRound, startOwnerSeason } from '../owner/play';
+import {
+  FFP_LIMIT, type OffshoreShare, ensureCompliance, euroSpots, fairAffiliate, ffpResult, ffpStatus, fringePlayers, inflatedSale, leaseback,
+  setAffiliate, setOffshore,
+} from '../owner/ffp';
+import { marketValue } from '../career/market';
 import { getLang, t } from '../i18n';
 import { NATIONS, type CareerDeps } from './careerView';
 import { coachAvatar, coachName, traitBars } from './coachUi';
@@ -55,7 +59,7 @@ const L = {
     sponsor: 'Титульный спонсор', sponsorOffers: 'Предложения спонсоров', choose: 'Подписать', perSeason: 'в сезон', seasonsWord: (n: number) => `${n} ${n === 1 ? 'сезон' : n < 5 ? 'сезона' : 'сезонов'}`,
     bonusFor: (p: number, b: string) => `+${b} за ${p === 1 ? 'чемпионство' : `топ-${p}`}`, noSponsor: 'Нет титульного спонсора', naming: 'Название стадиона',
     ledger: 'Отчёт о прибылях и убытках (сезон)', income: 'Доходы', costs: 'Расходы', other: 'Разовые статьи', profit: 'Операционный результат', forecast: 'Прогноз на год',
-    ledgerNames: { matchday: 'Билеты и абонементы', commercial: 'Коммерция и мерч', sponsor: 'Спонсор', broadcast: 'ТВ-права', prize: 'Призовые', wages: 'Зарплаты игроков', staff: 'Тренер и директора', interest: 'Проценты', maintenance: 'Содержание объектов', operations: 'Операционные', other: 'Прочее' } as Record<LedgerKey, string>,
+    ledgerNames: { matchday: 'Билеты и абонементы', commercial: 'Коммерция и мерч', sponsor: 'Спонсор', broadcast: 'ТВ-права', prize: 'Призовые', europe: 'Еврокубки', affiliate: 'Связанные стороны', wages: 'Зарплаты игроков', staff: 'Тренер и директора', interest: 'Проценты', maintenance: 'Содержание объектов', operations: 'Операционные', other: 'Прочее' } as Record<LedgerKey, string>,
     history: 'История', season: 'Сезон', pos: 'Место', profitShort: 'Прибыль',
     level: 'Уровень', upgrade: 'Улучшить', building: 'Стройка', roundsLeft: (n: number) => `ещё ${n} ${n === 1 ? 'тур' : n < 5 ? 'тура' : 'туров'}`, maxed: 'Максимум', capacity: 'Вместимость',
     squad: 'Состав', market: 'Рынок', clubs: 'Клубы лиги', sellClub: 'Продать клуб', sellConfirm: (p: string) => `Продать вашу долю за ~${p}? Карьера с этим клубом закончится.`, yes: 'Да, продать', cancel: 'Отмена',
@@ -64,6 +68,21 @@ const L = {
     err: { money: 'Не хватает денег.', bank: 'Банк больше не даёт в долг.', busy: 'Уже строится.', max: 'Максимальный уровень.', unwilling: 'Кандидат не хочет к вам: нужен бренд или репутация выше.', noCoach: 'Нужен тренер.' } as Record<string, string>,
     goals: { president: 'Задача по месту и рост бренда', investor: 'Без убытка и рост стоимости', visionary: 'Не менее 3 молодых (≤21) с 5+ матчами' } as Record<Archetype, string>,
     saved: 'Сохраняется автоматически.', deleteSave: 'Удалить карьеру владельца',
+    ffp: {
+      title: 'Финансовый фэйр-плей', limitNote: (p: number) => `лимит убытков за 3 сезона — ${p}% выручки`, thisSeason: 'Результат сезона по FFP', threeSeasons: 'За 3 сезона', limit: 'лимит',
+      europeIncome: 'Доход от еврокубков', spots: (n: number) => `путёвки: топ-${n}`, breachWarn: (b: string) => `Превышение лимита на ${b}: в конце сезона УЕФА наложит санкции.`,
+      europe: 'Еврокубки', euroBan: 'Бан в еврокубках', transferBan: 'Запрет регистрации', investigation: 'Расследование УЕФА',
+      greyTitle: 'Серые схемы', greySub: '— необязательно и рискованно',
+      disclaimer: 'Вымышленная игровая механика. Схемы обобщены по мотивам обвинений, которые в разные годы выдвигались против клубов, и не являются утверждениями о каком-либо реальном клубе.',
+      heat: 'Подозрения УЕФА и прессы', hidden: 'Скрыто денег (улики)', investigationOpen: 'идёт расследование',
+      s1: 'Спонсор из окружения владельца', s1d: (fair: string) => `Ваша компания платит клубу как спонсор — из ваших личных денег. Для FFP это доход. Всё, что выше рыночной цены (~${fair} в сезон), — улика.`,
+      set: 'Установить, €M/сезон', fromPocket: 'платите вы лично',
+      s2: 'Зарплаты через третьи компании', s2d: 'Часть зарплат игрокам и тренерам платится вне клуба (права на изображение, консалтинг). Расходы по отчётности ниже, деньги — ваши. Каждый платёж — улика.',
+      s3: 'Продать стадион своей же компании', s3d: 'Разово: компания владельца покупает стадион вдвое дороже рынка, клуб получает доход по FFP и платит аренду.', s3btn: 'Провести сделку', done: 'Сделка проведена', rent: 'аренда в сезон',
+      s4: 'Раздутая продажа дружественному клубу', s4d: 'Клуб-партнёр «покупает» игрока втрое дороже, вы тайно компенсируете 70%. Для FFP — прибыль от продажи.', s4btn: 'Продать ×3', worth: 'стоит',
+      ffpLine: (r: string, t: string, lim: string) => `FFP: сезон ${r}, за 3 сезона ${t} (лимит ${lim}).`, qualified: 'Путёвка в еврокубки: доход в следующем сезоне.',
+      opened: 'УЕФА открыл расследование. Вердикт — через сезон.', verdictNext: 'В начале следующего сезона — решение УЕФА.',
+    },
   },
   en: {
     title: 'Club owner', loading: 'Loading…', setupTitle: 'Become a club owner', setupSub: 'You don’t pick the formation — you build a football empire.',
@@ -92,7 +111,7 @@ const L = {
     sponsor: 'Title sponsor', sponsorOffers: 'Sponsor offers', choose: 'Sign', perSeason: 'a season', seasonsWord: (n: number) => `${n} season${n === 1 ? '' : 's'}`,
     bonusFor: (p: number, b: string) => `+${b} for ${p === 1 ? 'the title' : `top ${p}`}`, noSponsor: 'No title sponsor', naming: 'Stadium name',
     ledger: 'Profit and loss (season)', income: 'Income', costs: 'Costs', other: 'One-off items', profit: 'Operating result', forecast: 'Annual forecast',
-    ledgerNames: { matchday: 'Tickets & season tickets', commercial: 'Commercial & merchandise', sponsor: 'Sponsor', broadcast: 'TV rights', prize: 'Prize money', wages: 'Player wages', staff: 'Coach & directors', interest: 'Interest', maintenance: 'Facility upkeep', operations: 'Operations', other: 'Other' } as Record<LedgerKey, string>,
+    ledgerNames: { matchday: 'Tickets & season tickets', commercial: 'Commercial & merchandise', sponsor: 'Sponsor', broadcast: 'TV rights', prize: 'Prize money', europe: 'European football', affiliate: 'Related parties', wages: 'Player wages', staff: 'Coach & directors', interest: 'Interest', maintenance: 'Facility upkeep', operations: 'Operations', other: 'Other' } as Record<LedgerKey, string>,
     history: 'History', season: 'Season', pos: 'Pos', profitShort: 'Profit',
     level: 'Level', upgrade: 'Upgrade', building: 'Building', roundsLeft: (n: number) => `${n} round${n === 1 ? '' : 's'} left`, maxed: 'Maxed out', capacity: 'Capacity',
     squad: 'Squad', market: 'Market', clubs: 'League clubs', sellClub: 'Sell the club', sellConfirm: (p: string) => `Sell your stake for ~${p}? Your time at this club ends.`, yes: 'Yes, sell', cancel: 'Cancel',
@@ -101,6 +120,21 @@ const L = {
     err: { money: 'Not enough money.', bank: 'The bank won’t lend more.', busy: 'Already being built.', max: 'Maximum level.', unwilling: 'The candidate won’t join: you need a bigger brand or reputation.', noCoach: 'You need a coach.' } as Record<string, string>,
     goals: { president: 'League target and a growing brand', investor: 'No loss and a rising club value', visionary: 'At least 3 under-22s with 5+ games' } as Record<Archetype, string>,
     saved: 'Saves automatically.', deleteSave: 'Delete owner career',
+    ffp: {
+      title: 'Financial fair play', limitNote: (p: number) => `3-season loss limit: ${p}% of revenue`, thisSeason: 'Season FFP result', threeSeasons: 'Over 3 seasons', limit: 'limit',
+      europeIncome: 'European income', spots: (n: number) => `places: top ${n}`, breachWarn: (b: string) => `Over the limit by ${b}: UEFA will sanction the club at season end.`,
+      europe: 'In Europe', euroBan: 'European ban', transferBan: 'Registration ban', investigation: 'UEFA investigation',
+      greyTitle: 'Grey schemes', greySub: '— optional and risky',
+      disclaimer: 'A fictional game mechanic. The schemes are generalised from the kinds of allegations made against clubs over the years and are not claims about any real club.',
+      heat: 'Suspicion (UEFA and the press)', hidden: 'Money concealed (evidence)', investigationOpen: 'under investigation',
+      s1: 'Sponsor close to the owner', s1d: (fair: string) => `Your own company sponsors the club — with your personal money. FFP counts it as income. Anything above market rate (~${fair} a season) is evidence.`,
+      set: 'Set, €M a season', fromPocket: 'paid by you',
+      s2: 'Wages through third parties', s2d: 'Part of the players’ and coach’s pay goes outside the club (image rights, consultancy). Reported costs fall; the money is yours. Every payment is evidence.',
+      s3: 'Sell the stadium to your own company', s3d: 'One-off: the owner’s company buys the stadium at about twice its value; the club books FFP income and pays rent.', s3btn: 'Do the deal', done: 'Done', rent: 'rent a season',
+      s4: 'Inflated sale to a friendly club', s4d: 'A partner club “buys” a player for three times his value; you secretly cover 70%. FFP sees a profit on the sale.', s4btn: 'Sell ×3', worth: 'worth',
+      ffpLine: (r: string, t: string, lim: string) => `FFP: season ${r}, three seasons ${t} (limit ${lim}).`, qualified: 'Qualified for Europe: extra income next season.',
+      opened: 'UEFA has opened an investigation. The verdict comes in a season.', verdictNext: 'UEFA’s decision arrives at the start of next season.',
+    },
   },
 };
 const tr = () => L[getLang()];
@@ -123,7 +157,7 @@ function showOwner(root: HTMLElement, state: OwnerState, deps: CareerDeps): void
   if (state.owner.over) return renderOver(root, state, deps);
   if (state.status === 'seasonOver' && state.owner.summary) return renderSeasonEnd(root, state, state.owner.summary, deps);
   if (seasonComplete(state) && !state.owner.decision) {
-    const summary = ownerSeasonEnd(state);
+    const summary = finishOwnerSeason(state);
     ownerSave.save(state);
     return renderSeasonEnd(root, state, summary, deps);
   }
@@ -327,7 +361,7 @@ function renderHub(root: HTMLElement, state: OwnerState, deps: CareerDeps, flash
     return `<section class="panel owner-head">
       <div class="oh-id">${crestHtml(club, 52)}<div><div class="ch-name">${esc(club.name)}</div>
         <div class="muted">${o.flag} ${esc(o.name)} · ${lang() === 'ru' ? a.nameRu : a.nameEn}${o.share < 1 ? ` · ${l.share} ${Math.round(o.share * 100)}%` : ''}</div>
-        <div class="muted">${esc(leagueName(state.league.leagueId ?? 'nor'))} · ${seasonLabel(state.season)}</div></div></div>
+        <div class="muted">${esc(leagueName(state.league.leagueId ?? 'nor'))} · ${seasonLabel(state.season)}</div>${uefaChips()}</div></div>
       <div class="kpis">
         <div><span class="muted">${l.cash}</span><b class="num ${o.cash < 0 ? 'risk' : ''}">${money(o.cash)}</b></div>
         <div><span class="muted">${l.budget}</span><b class="num">${money(m.budget)}</b></div>
@@ -336,6 +370,16 @@ function renderHub(root: HTMLElement, state: OwnerState, deps: CareerDeps, flash
       </div>
       <div class="oh-meters">${meter(l.fans, o.fanMood)}${meter(l.trust, o.coach?.trust ?? 0)}${meter(l.brand, o.brand)}</div>
     </section>`;
+  };
+
+  const uefaChips = () => {
+    const c = ensureCompliance(state);
+    const chips: string[] = [];
+    if (c.europe && c.euroBanUntil < state.season) chips.push(`<span class="chip up">★ ${l.ffp.europe}</span>`);
+    if (c.euroBanUntil >= state.season) chips.push(`<span class="chip bad">${l.ffp.euroBan}</span>`);
+    if ((ensureMarket(state).banUntil ?? 0) >= state.season) chips.push(`<span class="chip bad">${l.ffp.transferBan}</span>`);
+    if (c.investigation !== null) chips.push(`<span class="chip bad">⚖ ${l.ffp.investigation}</span>`);
+    return chips.length ? `<div class="uefa-chips">${chips.join('')}</div>` : '';
   };
 
   const tabs = () => `<nav class="career-tabs" role="tablist">${(Object.keys(l.tabs) as Tab[])
@@ -362,7 +406,7 @@ function renderHub(root: HTMLElement, state: OwnerState, deps: CareerDeps, flash
     const r = nextRound(state.league);
     const f = r ? state.league.fixtures.find((x) => x.round === r && (x.home === state.clubId || x.away === state.clubId)) : null;
     const block = blocker(state);
-    const table = computeTable(state.league.clubs, state.league.fixtures);
+    const table = computeTable(state.league.clubs, state.league.fixtures, state.league.penalties);
     const pos = currentPosition(state);
     const target = boardTarget(state.clubId, state.league.clubs);
     const lastR = (state.devRound ?? 0);
@@ -397,7 +441,7 @@ function renderHub(root: HTMLElement, state: OwnerState, deps: CareerDeps, flash
       ${results ? `<section class="panel pad"><div class="card-title"><h3>${l.lastRound} · ${l.round} ${lastR}</h3></div>${results}</section>` : ''}
       <section class="panel pad"><div class="card-title"><h3>${l.news}</h3></div><ul class="news">${state.news.slice(0, 10).map((n) => `<li><span class="muted num">${seasonLabel(n.season)}</span> ${esc(lang() === 'ru' ? n.ru : n.en)}</li>`).join('')}</ul></section>
       <section class="panel pad"><div class="card-title"><h3>${l.table}</h3></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>#</th><th class="name-cell">${t('club')}</th><th>${t('played')}</th><th>${t('goalsCol')}</th><th>${t('pts')}</th></tr></thead><tbody>
-        ${table.map((row, i) => `<tr class="${row.club === state.clubId ? 'me' : ''}"><td>${i + 1}</td><td class="name-cell"><span class="cell-flex">${crestHtml(clubById(row.club), 20)}${esc(clubById(row.club).name)}</span></td><td>${row.p}</td><td>${row.gf}:${row.ga}</td><td><b>${row.pts}</b></td></tr>`).join('')}
+        ${table.map((row, i) => `<tr class="${row.club === state.clubId ? 'me' : ''}"><td>${i + 1}</td><td class="name-cell"><span class="cell-flex">${crestHtml(clubById(row.club), 20)}${esc(clubById(row.club).name)}</span></td><td>${row.p}</td><td>${row.gf}:${row.ga}</td><td><b>${row.pts}</b>${state.league.penalties?.[row.club] ? ` <span class="risk num">−${state.league.penalties[row.club]}</span>` : ''}</td></tr>`).join('')}
       </tbody></table></div></section>`;
   };
 
@@ -491,9 +535,46 @@ function renderHub(root: HTMLElement, state: OwnerState, deps: CareerDeps, flash
         <div class="ledger"><div><h4>${l.income}</h4>${INCOME_KEYS.map((k) => row(k, o.ledger[k], 1)).join('')}</div>
           <div><h4>${l.costs}</h4>${COST_KEYS.map((k) => row(k, o.ledger[k], -1)).join('')}${o.ledger.other ? row('other', o.ledger.other, o.ledger.other < 0 ? -1 : 1) : ''}</div></div>
         <div class="led-row total"><span>${l.profit}</span><b class="num ${profit < 0 ? 'down' : 'up'}">${money(profit)}</b></div></section>
+      ${greySection()}
       ${o.history.length ? `<section class="panel pad"><div class="card-title"><h3>${l.history}</h3></div><div style="overflow-x:auto"><table class="table"><thead><tr><th class="name-cell">${l.season}</th><th>${l.pos}</th><th>${l.revenue}</th><th>${l.profitShort}</th><th>${l.valuation}</th><th></th></tr></thead><tbody>
         ${[...o.history].reverse().map((h) => `<tr><td class="name-cell num">${h.label}</td><td>${h.position}</td><td>${money(h.revenue)}</td><td class="${h.profit < 0 ? 'down' : 'up'}">${money(h.profit)}</td><td>${money(h.valuation)}</td><td>${h.goalMet ? '✓' : '✗'}</td></tr>`).join('')}
       </tbody></table></div></section>` : ''}`;
+  };
+
+  // ── financial fair play & grey schemes ──
+  const greySection = () => {
+    const o = state.owner;
+    const c = ensureCompliance(state);
+    const f = l.ffp;
+    const now = ffpResult(state);
+    const st = ffpStatus(state, now.result);
+    const fair = fairAffiliate(state);
+    const fringe = fringePlayers(state).slice(0, 6);
+    const heatCls = c.heat >= 60 ? 'bad' : c.heat >= 30 ? 'mid' : 'good';
+    return `<section class="panel pad ffp">
+        <div class="card-title"><h3>${f.title}</h3><span class="muted">${f.limitNote(Math.round(FFP_LIMIT * 100))}</span></div>
+        <div class="kpis">
+          <div><span class="muted">${f.thisSeason}</span><b class="num ${now.result < 0 ? 'down' : 'up'}">${money(now.result)}</b></div>
+          <div><span class="muted">${f.threeSeasons}</span><b class="num ${st.breach ? 'down' : ''}">${money(st.total)}</b><span class="muted">${f.limit} ${money(st.limit)}</span></div>
+          <div><span class="muted">${f.europeIncome}</span><b class="num">${c.europe && c.euroBanUntil < state.season ? money(o.size * 0.14) : '—'}</b><span class="muted">${f.spots(euroSpots(state))}</span></div>
+        </div>
+        ${st.breach ? `<p class="risk">${f.breachWarn(money(st.breach))}</p>` : ''}
+      </section>
+      <details class="panel pad grey" ${c.affiliate || c.offshore || c.leasebackDone || c.hidden ? 'open' : ''}>
+        <summary><b>🕶 ${f.greyTitle}</b> <span class="muted">${f.greySub}</span></summary>
+        <p class="muted disclaimer">${f.disclaimer}</p>
+        <div class="o-meter"><div class="meter-label"><span>${f.heat}</span><b class="num">${Math.round(c.heat)}</b></div><div class="meter ${heatCls}"><i style="width:${c.heat}%"></i></div></div>
+        <p class="muted">${f.hidden}: <b class="num">${money(c.hidden)}</b>${c.investigation !== null ? ` · <span class="risk">⚖ ${f.investigationOpen}</span>` : ''}</p>
+        <div class="scheme"><h4>${f.s1}</h4><p class="muted">${f.s1d(money(fair))}</p>
+          <div class="fa"><input type="number" id="aAff" min="0" step="1" value="${c.affiliate}"><button class="btn small" type="button" id="doAff">${f.set}</button><span class="muted">${f.fromPocket}</span></div></div>
+        <div class="scheme"><h4>${f.s2}</h4><p class="muted">${f.s2d}</p>
+          <div class="seg" role="group">${([0, 0.1, 0.2, 0.3] as OffshoreShare[]).map((v) => `<button type="button" data-offshore="${v}" aria-pressed="${c.offshore === v}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
+        <div class="scheme"><h4>${f.s3}</h4><p class="muted">${f.s3d}</p>
+          ${c.leasebackDone ? `<p class="muted">${f.done} · ${f.rent} ${money(c.leasebackRent)}</p>` : `<button class="btn small" type="button" id="doLease">${f.s3btn}</button>`}</div>
+        <div class="scheme"><h4>${f.s4}</h4><p class="muted">${f.s4d}</p>
+          <div class="cand-list">${fringe.map((p) => `<div class="cand"><div><b>${esc(p.name)}</b><div class="muted">${f.worth} ${money(marketValue(p))} → ${money(Math.max(1, marketValue(p) * 3))}</div></div><button class="btn small" type="button" data-inflate="${esc(p.id)}">${f.s4btn}</button></div>`).join('')}</div></div>
+        ${c.history.length ? `<ul class="news">${c.history.slice(0, 5).map((h) => `<li><span class="muted num">${seasonLabel(h.season)}</span> ${esc(lang() === 'ru' ? h.ru : h.en)}</li>`).join('')}</ul>` : ''}
+      </details>`;
   };
 
   // ── facilities ──
@@ -620,6 +701,24 @@ function renderHub(root: HTMLElement, state: OwnerState, deps: CareerDeps, flash
       ensureMarket(state).wageBudget = Math.max(0, Math.round(num('aWages')));
       redraw();
     });
+    on('#doAff', () => {
+      setAffiliate(state, Math.max(0, num('aAff')));
+      redraw();
+    });
+    on('[data-offshore]', (el) => {
+      setOffshore(state, Number(el.dataset.offshore) as OffshoreShare);
+      redraw();
+    });
+    on('#doLease', () => {
+      const r = leaseback(state);
+      msg = r.ok ? '' : l.err[r.reason === 'money' ? 'money' : 'busy'];
+      redraw();
+    });
+    on('[data-inflate]', (el) => {
+      const r = inflatedSale(state, el.dataset.inflate!);
+      msg = r.ok ? '' : l.err.money;
+      redraw();
+    });
     on('[data-tickets]', (el) => {
       state.owner.tickets = el.dataset.tickets as TicketPolicy;
       redraw();
@@ -722,10 +821,16 @@ function renderSeasonEnd(root: HTMLElement, state: OwnerState, s: OwnerSummary, 
         <div><span class="muted">${l.valuation}</span><b class="num">${money(s.valuation)}</b><span class="muted ${s.valuation >= s.valuationBefore ? 'up' : 'down'}">${s.valuation >= s.valuationBefore ? '▲' : '▼'} ${money(Math.abs(s.valuation - s.valuationBefore))}</span></div>
       </div>
       <p class="muted">${l.prize}: ${money(s.prize)}${s.sponsorBonus ? ` · ${l.sponsorBonus}: ${money(s.sponsorBonus)}` : ''}</p>
+      ${s.ffp ? `<div class="ffp-end">
+        <p>${l.ffp.ffpLine(money(s.ffp.result), money(s.ffp.total), money(s.ffp.limit))}</p>
+        ${s.ffp.europe ? `<p class="ok">★ ${l.ffp.qualified}</p>` : ''}
+        ${s.ffp.investigationOpened ? `<p class="risk">⚖ ${l.ffp.opened}</p>` : ''}
+        ${s.ffp.verdictComing ? `<p class="risk">⚖ ${l.ffp.verdictNext}</p>` : ''}
+      </div>` : ''}
       <button class="btn primary" type="button" id="nextSeason">${l.startNext} ${seasonLabel(state.season + 1)} →</button>
     </section>`;
   root.querySelector('#nextSeason')!.addEventListener('click', () => {
-    ownerNextSeason(state);
+    startOwnerSeason(state);
     ownerSave.save(state);
     renderHub(root, state, deps);
     window.scrollTo(0, 0);

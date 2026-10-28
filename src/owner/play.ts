@@ -7,7 +7,8 @@ import { type FixtureResult, nextRound } from '../league/league';
 import type { SimRequest } from '../league/worker';
 import { directorRound } from './director';
 import { coachWalksOut, maybeDecision } from './events';
-import { type OwnerState, bookRound } from './owner';
+import { complianceRound, complianceSeasonEnd, complianceSeasonStart, ensureCompliance } from './ffp';
+import { type OwnerState, type OwnerSummary, bookRound, ownerNextSeason, ownerSeasonEnd } from './owner';
 
 export const ownerSave = createSaveSlot<OwnerState>('pm-owner-v1', 'owner');
 
@@ -43,10 +44,25 @@ export function afterOwnerRound(state: OwnerState): void {
   const done = state.devRound ?? 0;
   for (let r = state.owner.finRound + 1; r <= done; r++) {
     bookRound(state, r);
+    complianceRound(state, r);
     if (state.owner.over) return;
     directorRound(state, r);
     maybeDecision(state, r);
   }
   marketTick(state);
   coachWalksOut(state);
+}
+
+/** Season end: the club's accounts, then UEFA's view of them (FFP, Europe, investigations). */
+export function finishOwnerSeason(state: OwnerState): OwnerSummary {
+  ensureCompliance(state);
+  const summary = ownerSeasonEnd(state);
+  summary.ffp = complianceSeasonEnd(state, summary.position);
+  return summary;
+}
+
+/** Next season; a pending UEFA verdict opens it as a boardroom decision. */
+export function startOwnerSeason(state: OwnerState): void {
+  ownerNextSeason(state);
+  complianceSeasonStart(state);
 }

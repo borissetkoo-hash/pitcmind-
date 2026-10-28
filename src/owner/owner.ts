@@ -9,6 +9,7 @@ import { ALL_COACHES, type Coach, COACHES, coachById } from '../data/coaches';
 import { FIRST_NAMES, LAST_NAMES, NAMES_BY_COUNTRY } from '../data/names';
 import { Rng, hashString } from '../engine/rng';
 import { computeTable, newSeason, nextRound } from '../league/league';
+import type { Compliance, ComplianceSummary } from './ffp';
 
 /**
  * Club Owner mode: the player is not the coach but the person who owns the club — buys it,
@@ -99,9 +100,9 @@ export interface Sponsor {
   bonus: number;
 }
 
-export type LedgerKey = 'matchday' | 'commercial' | 'sponsor' | 'broadcast' | 'prize' | 'wages' | 'staff' | 'interest' | 'maintenance' | 'operations' | 'other';
+export type LedgerKey = 'matchday' | 'commercial' | 'sponsor' | 'broadcast' | 'prize' | 'europe' | 'affiliate' | 'wages' | 'staff' | 'interest' | 'maintenance' | 'operations' | 'other';
 export type Ledger = Record<LedgerKey, number>;
-export const INCOME_KEYS: LedgerKey[] = ['matchday', 'commercial', 'sponsor', 'broadcast', 'prize'];
+export const INCOME_KEYS: LedgerKey[] = ['matchday', 'commercial', 'sponsor', 'broadcast', 'prize', 'europe', 'affiliate'];
 export const COST_KEYS: LedgerKey[] = ['wages', 'staff', 'interest', 'maintenance', 'operations'];
 
 export interface OwnerSeason {
@@ -182,6 +183,8 @@ export interface OwnerData {
   over: null | { reason: 'sold' | 'bankrupt'; season: number; price: number };
   /** The finished season's summary, kept until the next season starts (so a reload can't pay out twice). */
   summary?: OwnerSummary | null;
+  /** Financial fair play, European football and the optional grey schemes (see owner/ffp.ts). */
+  compliance?: Compliance;
 }
 
 export type OwnerState = CareerState & { mode: 'owner'; owner: OwnerData };
@@ -312,7 +315,7 @@ export interface OwnerSetup {
   wealth?: number;
 }
 
-const emptyLedger = (): Ledger => ({ matchday: 0, commercial: 0, sponsor: 0, broadcast: 0, prize: 0, wages: 0, staff: 0, interest: 0, maintenance: 0, operations: 0, other: 0 });
+export const emptyLedger = (): Ledger => ({ matchday: 0, commercial: 0, sponsor: 0, broadcast: 0, prize: 0, europe: 0, affiliate: 0, wages: 0, staff: 0, interest: 0, maintenance: 0, operations: 0, other: 0 });
 
 function mirrorCoach(state: CareerState, coach: Coach): void {
   state.coach = { firstName: coach.name, lastName: '', flag: coach.flag, look: coach.look ?? { ...DEFAULT_LOOK }, style: 'balanced', traits: { ...coach.traits } };
@@ -449,8 +452,8 @@ export function revenueRunRate(state: OwnerState): number {
 /** Owner's net worth: personal fortune plus his stake in the club. */
 export const netWorth = (state: OwnerState) => round1(state.owner.wealth + state.owner.share * clubValuation(state));
 
-const book = (o: OwnerData, k: LedgerKey, v: number) => {
-  o.ledger[k] = round1(o.ledger[k] + v);
+export const book = (o: OwnerData, k: LedgerKey, v: number) => {
+  o.ledger[k] = round1((o.ledger[k] ?? 0) + v);
 };
 
 export function homeGames(state: CareerState): number {
@@ -518,7 +521,7 @@ export function bookRound(state: OwnerState, round: number): void {
 }
 
 export function currentPosition(state: CareerState): number {
-  return computeTable(state.league.clubs, state.league.fixtures).findIndex((r) => r.club === state.clubId) + 1;
+  return computeTable(state.league.clubs, state.league.fixtures, state.league.penalties).findIndex((r) => r.club === state.clubId) + 1;
 }
 
 // ───────────────────────────── owner actions ──
@@ -678,6 +681,8 @@ export function sponsorOffers(state: OwnerState): Sponsor[] {
 // ───────────────────────────── season ──
 
 export interface OwnerSummary {
+  /** UEFA's view of the season (set by owner/play.ts). */
+  ffp?: ComplianceSummary;
   position: number;
   target: number;
   prize: number;
@@ -701,7 +706,7 @@ export function ownerGoalMet(state: OwnerState, position: number, target: number
 
 export function ownerSeasonEnd(state: OwnerState): OwnerSummary {
   const o = state.owner;
-  const table = computeTable(state.league.clubs, state.league.fixtures);
+  const table = computeTable(state.league.clubs, state.league.fixtures, state.league.penalties);
   const position = table.findIndex((r) => r.club === state.clubId) + 1;
   const target = boardTarget(state.clubId, state.league.clubs);
   const n = state.league.clubs.length;

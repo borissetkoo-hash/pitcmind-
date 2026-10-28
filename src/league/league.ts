@@ -69,7 +69,8 @@ export function roundRobin(clubIds: string[], seed: number): Fixture[] {
   return all.flatMap((rd, r) => rd.map(([home, away]) => ({ id: id++, round: r + 1, home, away, seed: (seed * 7919 + id * 104729) >>> 0 })));
 }
 
-export function computeTable(clubIds: string[], fixtures: Fixture[]): TableRow[] {
+/** League table; `penalties` are points deducted by a disciplinary body (owner mode). */
+export function computeTable(clubIds: string[], fixtures: Fixture[], penalties: Record<string, number> = {}): TableRow[] {
   const rows = new Map<string, TableRow>(
     clubIds.map((c) => [c, { club: c, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, xgf: 0, xga: 0, pts: 0, form: [] }]),
   );
@@ -96,6 +97,10 @@ export function computeTable(clubIds: string[], fixtures: Fixture[]): TableRow[]
       h.d++; a.d++; h.pts++; a.pts++; h.form.push('D'); a.form.push('D');
     }
   }
+  for (const [club, pts] of Object.entries(penalties)) {
+    const r = rows.get(club);
+    if (r) r.pts -= pts;
+  }
   return [...rows.values()].sort((x, y) => y.pts - x.pts || y.gf - y.ga - (x.gf - x.ga) || y.gf - x.gf || x.club.localeCompare(y.club));
 }
 
@@ -118,6 +123,8 @@ export interface SeasonState {
   leagueId?: string;
   clubs: string[];
   fixtures: Fixture[];
+  /** Points deducted this season (e.g. a financial fair-play sanction). */
+  penalties?: Record<string, number>;
 }
 
 export function newSeason(clubs: ClubData[], seed: number, leagueId?: string): SeasonState {

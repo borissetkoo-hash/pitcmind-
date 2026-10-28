@@ -558,3 +558,17 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
   .kpis { grid-template-columns: 1fr 1fr; }
   .kpis b { font-size: 16px; }
 }
+
+/* ── owner: fair play & grey schemes ── */
+.uefa-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chip.bad { border-color: var(--danger); color: #f19a9a; }
+.grey { display: grid; gap: 12px; border-color: #5b4a7a; }
+.grey summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; min-height: 32px; }
+.grey summary::-webkit-details-marker { display: none; }
+.grey[open] { gap: 14px; }
+.grey .disclaimer { font-size: 12px; margin: 0; }
+.scheme { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.scheme h4 { margin: 0; font-size: 14px; }
+.scheme p { margin: 0; font-size: 13px; }
+.ffp-end { display: grid; gap: 4px; }
+.ffp-end p { margin: 0; }

@@ -18,7 +18,7 @@ import {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-interface EventDef {
+export interface EventDef {
   kind: string;
   /** Relative weight when several events are possible. */
   weight: number;
@@ -27,7 +27,7 @@ interface EventDef {
   resolve(state: OwnerState, d: Decision, option: 'a' | 'b' | 'c', rng: Rng): void;
 }
 
-const opt = (id: DecisionOption['id'], ru: string, en: string, hintRu: string, hintEn: string, disabled = false): DecisionOption => ({ id, ru, en, hintRu, hintEn, disabled });
+export const opt = (id: DecisionOption['id'], ru: string, en: string, hintRu: string, hintEn: string, disabled = false): DecisionOption => ({ id, ru, en, hintRu, hintEn, disabled });
 
 function form(state: OwnerState, n = 5): number[] {
   return state.league.fixtures
@@ -443,6 +443,11 @@ const EVENTS: EventDef[] = [
     },
   },
 ];
+
+/** Lets other modules (financial fair play) add their own boardroom events. */
+export function registerEvents(defs: EventDef[]): void {
+  for (const d of defs) if (!EVENTS.some((e) => e.kind === d.kind)) EVENTS.push(d);
+}
 
 /** Rolls for a boardroom event after a round: roughly one every three rounds, at most once per kind a season. */
 export function maybeDecision(state: OwnerState, round: number): void {

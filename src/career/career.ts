@@ -128,6 +128,8 @@ export interface CareerState {
   devRound?: number;
   /** Player reports of played fixtures waiting for their round to be processed. */
   reports?: Record<number, PlayerReport[]>;
+  /** Multipliers from the club's facilities (owner mode): development, recovery, injury lay-offs. */
+  boosts?: { dev?: number; recovery?: number; injury?: number };
 }
 
 export const seasonLabel = (season: number) => `${FIRST_YEAR + season - 1}/${String((FIRST_YEAR + season) % 100).padStart(2, '0')}`;
@@ -333,7 +335,7 @@ export function startNextSeason(state: CareerState, newClubId?: string): void {
       en: `A new challenge: ${state.coach.firstName} ${state.coach.lastName} takes over at ${club.name}${old ? `, replacing ${old.name}` : ''}.`,
     });
   }
-  const aiClubs = state.league.clubs.filter((id) => state.coaches[id] !== PLAYER_COACH);
+  const aiClubs = state.league.clubs.filter((id) => state.coaches[id] !== PLAYER_COACH && id !== state.clubId);
   const changes = 2 + rng.int(0, 1);
   for (let i = 0; i < changes; i++) {
     const clubId = aiClubs[rng.int(0, aiClubs.length - 1)];

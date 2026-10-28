@@ -26,7 +26,8 @@ import {
 import { type CloudStatus, cloudStatus, deleteCareer, loadCareer, onCloudStatus, saveCareer } from '../career/storage';
 import { ensureMarket, fmtMoney, marketTick, transferWindow } from '../career/market';
 import { readinessHtml, renderMarketTab, renderSquadTab } from './transfersUi';
-import { completeRound, matchClub, matchSquad, processRounds } from '../career/development';
+import { completeRound, matchClub, processRounds } from '../career/development';
+import { overridesFor } from '../career/sim';
 import { LEAGUES } from '../data/clubSeeds';
 import { clubById, leagueClubs } from '../data/clubs';
 import { leagueName, leagueTabsHtml } from './leagueUi';
@@ -97,7 +98,7 @@ const L = {
 };
 const tr = () => L[getLang()];
 
-const NATIONS: [string, string, string][] = [
+export const NATIONS: [string, string, string][] = [
   ['🇷🇺', 'Россия', 'Russia'], ['🇧🇾', 'Беларусь', 'Belarus'], ['🇰🇿', 'Казахстан', 'Kazakhstan'], ['🇺🇦', 'Украина', 'Ukraine'],
   ['🇺🇿', 'Узбекистан', 'Uzbekistan'], ['🇦🇲', 'Армения', 'Armenia'], ['🇬🇪', 'Грузия', 'Georgia'], ['🇦🇿', 'Азербайджан', 'Azerbaijan'],
   ['🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Англия', 'England'], ['🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Шотландия', 'Scotland'], ['🇮🇪', 'Ирландия', 'Ireland'], ['🇪🇸', 'Испания', 'Spain'],
@@ -121,14 +122,6 @@ function matchToResult(m: Match, f: Fixture): FixtureResult {
   };
 }
 
-function overridesFor(state: CareerState, f: Fixture) {
-  const h = clubSide(state, f.home);
-  const a = clubSide(state, f.away);
-  return {
-    homeCoach: h.coach.traits, awayCoach: a.coach.traits, homeTactics: h.tactics, awayTactics: a.tactics,
-    homePlayers: matchSquad(state, f.home), awayPlayers: matchSquad(state, f.away), report: true,
-  };
-}
 
 /** Fixtures that should already have been played: every round up to the user's latest result. */
 function backlog(state: CareerState): Fixture[] {

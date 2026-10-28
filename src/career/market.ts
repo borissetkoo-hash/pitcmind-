@@ -56,6 +56,8 @@ export interface MarketState {
   seq: number;
   /** Last round already processed by the market (offers, AI deals). */
   tickRound: number;
+  /** Wage scale the wage budget was set in (saves before 2 used wages four times lower). */
+  wageScale?: number;
 }
 
 export const SQUAD_MIN = 16;
@@ -82,8 +84,10 @@ export function marketValue(p: PlayerData): number {
 
 /** Weekly wage in €K, from ability (older stars still earn well). */
 export function wageOf(p: PlayerData): number {
-  return Math.round(4 + 2.6 * baseValue(rating(p)) ** 0.85);
+  // Scaled so a squad's wage bill is ~40 % of its market value a year, as in top-flight football.
+  return Math.round((4 + 2.6 * baseValue(rating(p)) ** 0.85) * WAGE_SCALE);
 }
+const WAGE_SCALE = 4;
 
 export const fmtMoney = (m: number) => (m >= 1 ? `€${m >= 100 ? Math.round(m) : round1(m)}M` : `€${Math.round(m * 1000)}K`);
 export const fmtWage = (k: number) => `€${k}K`;
@@ -176,9 +180,11 @@ function trim(state: CareerState, clubId: string): void {
 export const squadValue = (players: PlayerData[]) => players.reduce((s, p) => s + marketValue(p), 0);
 export const wageBill = (state: CareerState) => squadOf(state, state.clubId).reduce((s, p) => s + wageOf(p), 0);
 
-function wealth(clubId: string) {
+/** How much money there is in a club's league (England richest, Brazil poorest). */
+export function leagueWealth(clubId: string) {
   return WEALTH[leagueOf(clubId)] ?? 1;
 }
+const wealth = leagueWealth;
 
 /** A fresh market for the user's club: budget from the squad's value and the league's wealth. */
 export function initMarket(state: CareerState): MarketState {
@@ -187,13 +193,17 @@ export function initMarket(state: CareerState): MarketState {
   return {
     budget: round1(value * 0.18 * wealth(state.clubId)),
     wageBudget: Math.round(bill * 1.12),
-    listed: {}, offers: [], loans: [], log: [], bids: {}, seq: 0, tickRound: userRoundsPlayed(state),
+    listed: {}, offers: [], loans: [], log: [], bids: {}, seq: 0, tickRound: userRoundsPlayed(state), wageScale: WAGE_SCALE,
   };
 }
 
 /** Older saves had no market: add one (and keep using the generated squads). */
 export function ensureMarket(state: CareerState): MarketState {
   state.market ??= initMarket(state);
+  if ((state.market.wageScale ?? 1) !== WAGE_SCALE) {
+    state.market.wageBudget = Math.round((state.market.wageBudget * WAGE_SCALE) / (state.market.wageScale ?? 1));
+    state.market.wageScale = WAGE_SCALE;
+  }
   return state.market;
 }
 
@@ -453,7 +463,7 @@ export function prizeMoney(state: CareerState, position: number): number {
 }
 
 /** Loans end, prize money arrives, a new wage budget is set and the bid counters reset. */
-export function closeSeasonMarket(state: CareerState, position: number): number {
+export function closeSeasonMarket(state: CareerState, position: number, payPrize = true): number {
   const m = ensureMarket(state);
   for (const l of m.loans) {
     const squad = squadOf(state, l.to);
@@ -464,7 +474,8 @@ export function closeSeasonMarket(state: CareerState, position: number): number 
     setSquad(state, l.from, [...home, { ...p, number: freeNumber(home, p.number) }]);
   }
   m.loans = [];
-  const prize = prizeMoney(state, position);
+  // In owner mode prize money goes to the club's accounts instead (see owner/owner.ts).
+  const prize = payPrize ? prizeMoney(state, position) : 0;
   m.budget = round1(m.budget + prize);
   m.wageBudget = Math.max(m.wageBudget, Math.round(wageBill(state) * 1.08));
   m.offers = [];

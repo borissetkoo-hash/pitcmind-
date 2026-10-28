@@ -9,6 +9,7 @@ import { coachById } from './data/coaches';
 import { renderAbout } from './ui/about';
 import { installTooltips } from './ui/charts';
 import { renderCareer } from './ui/careerView';
+import { renderOwner } from './ui/ownerView';
 import { renderCoaches } from './ui/coachUi';
 import { bootScreen } from './ui/boot';
 import { renderMenu } from './ui/menu';
@@ -34,6 +35,7 @@ function drawNav(route: string): void {
   const items: [string, string][] = [
     ['#/menu', t('navMenu')],
     ['#/career', t('menuCareer')],
+    ['#/owner', t('menuOwner')],
     ['#/match', t('navMatch')],
     ['#/league', t('navLeague')],
     ['#/coaches', t('coaches')],
@@ -84,6 +86,22 @@ function route(): void {
     });
   } else if (r.startsWith('/about')) {
     renderAbout(view);
+  } else if (r.startsWith('/owner')) {
+    renderOwner(view, {
+      playLive: (setup, focusTeam, onFinish) => {
+        history.pushState(null, '', '#/match/live');
+        drawNav('/owner');
+        teardown();
+        current = new MatchView(view, setup, {
+          focusTeam,
+          nextLabel: t('toOwner'),
+          onFinish,
+          onNewMatch: () => {
+            location.hash = '#/owner';
+          },
+        });
+      },
+    });
   } else if (r.startsWith('/career')) {
     renderCareer(view, {
       playLive: (setup, focusTeam, onFinish) => {

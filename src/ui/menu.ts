@@ -8,6 +8,7 @@ import { leagueName } from './leagueUi';
 import { computeTable, nextRound, type SeasonState } from '../league/league';
 import { type Lang, getLang, setLang, t } from '../i18n';
 import { getSettings, updateSettings } from '../settings';
+import { ownerMenuLabel } from './ownerView';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -20,12 +21,14 @@ export function renderMenu(root: HTMLElement, season: SeasonState, onLangChange:
   const leader = played ? clubById(table[0].club) : null;
   const s = getSettings();
   const career = peekCareer();
+  const owner = ownerMenuLabel();
 
   root.innerHTML = `
     <div class="menu">
       <nav class="menu-list" aria-label="Main menu">
         <div class="menu-title"><span class="brand-mark">◉</span> PitchMind</div>
         <a class="menu-item primary career-tile" href="#/career">${career ? `<span class="tile-portrait">${portraitHtml(career.coach.look, 52)}</span>` : ''}<b>👔 ${career ? t('menuCareerCont') : t('menuCareer')}</b><span>${career ? `${esc(career.coach.firstName)} ${esc(career.coach.lastName)} · ${esc(clubById(career.clubId).name)} · ${seasonLabel(career.season)}` : t('menuCareerSub')}</span></a>
+        <a class="menu-item primary owner-tile" href="#/owner"><b>💼 ${owner ? t('menuOwnerCont') : t('menuOwner')}</b><span>${owner ? esc(owner) : t('menuOwnerSub')}</span></a>
         <a class="menu-item" href="#/match"><b>⚽ ${t('menuQuick')}</b><span>${t('menuQuickSub')}</span></a>
         <a class="menu-item" href="#/league"><b>🏆 ${played ? t('menuContinue') : t('menuSeason')}</b><span>${t('menuSeasonSub')}</span></a>
         <a class="menu-item" href="#/coaches"><b>👔 ${t('menuCoaches')}</b><span>${t('menuCoachesSub')}</span></a>

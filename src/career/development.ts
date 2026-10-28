@@ -179,6 +179,8 @@ function applyReport(state: CareerState, report: PlayerReport[], round: number, 
     const user = mine.has(r.id);
     if (r.injured) {
       s.inj = rollInjury(new Rng(hashString(`inj-${state.seed}-${state.season}-${round}-${r.id}`)));
+      // A better medical centre gets players back sooner (owner mode).
+      if (user && state.boosts?.injury) s.inj.r = Math.max(1, Math.round(s.inj.r * state.boosts.injury));
       const k = INJURIES[s.inj.k];
       if (user) news(state, `${p.name}: ${k.ru.toLowerCase()}, пропустит ${s.inj.r} ${matchesWord(s.inj.r)}.`, `${p.name}: ${k.en.toLowerCase()}, out for ${s.inj.r} match${s.inj.r === 1 ? '' : 'es'}.`);
     }
@@ -207,7 +209,7 @@ function recover(state: CareerState, round: number): void {
     const risk = user ? { low: 0.001, normal: 0.003, high: 0.008 }[intensity] : 0.003;
     for (const p of squadOf(state, clubId)) {
       const cur = statusOf(state, p.id);
-      const rec = 13 + p.attrs.stamina * 0.07 + (fit - 10) * 0.5 - Math.max(0, p.age - 30) * 0.6 + (user ? { low: 4, normal: 0, high: -3 }[intensity] : 0);
+      const rec = 13 + p.attrs.stamina * 0.07 + (fit - 10) * 0.5 - Math.max(0, p.age - 30) * 0.6 + (user ? { low: 4, normal: 0, high: -3 }[intensity] : 0) + (user ? state.boosts?.recovery ?? 0 : 0);
       const hurt = !cur.inj && rng.chance(risk * (cur.c < 60 ? 2 : 1));
       if (cur === FRESH && !hurt) continue;
       const s = mut(state, p.id);
@@ -274,7 +276,7 @@ function developWeek(state: CareerState, round: number, played: Set<string>): vo
   const training = state.training ?? DEFAULT_TRAINING;
   const t = state.coach.traits;
   // Coaches who are good at conditioning and organisation get more out of training.
-  const coachBoost = 1 + ((t.fitness + t.organisation) / 2 - 12) * 0.03;
+  const coachBoost = (1 + ((t.fitness + t.organisation) / 2 - 12) * 0.03) * (state.boosts?.dev ?? 1);
   const rng = new Rng(hashString(`dev-${state.seed}-${state.season}-${round}`));
   let changed = false;
   const squad = squadOf(state, state.clubId).map((p0) => {

@@ -23,8 +23,17 @@
   background: var(--bg);
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(1200px 600px at 70% -10%, #15233d 0%, var(--bg) 60%); }
-button, input, select { font: inherit; color: inherit; }
+body { margin: 0; min-height: 100vh; color: var(--text); background: radial-gradient(1200px 600px at 70% -10%, #15233d 0%, var(--bg) 60%) var(--bg); color-scheme: dark; }
+/* Light text everywhere, set explicitly: the page may be embedded in a frame (or a phone browser) whose
+   own defaults paint text black, and that would leave dark text on the dark theme. */
+h1, h2, h4, h5, p, li, td, th, table, label, summary, details, dt, dd, blockquote, figcaption, legend, b, strong, em, small, span { color: inherit; }
+h1, h2, h4 { color: var(--text); }
+button, input, select, textarea { font: inherit; color: var(--text); }
+input, select, textarea { -webkit-text-fill-color: currentColor; caret-color: var(--accent); }
+input::placeholder, textarea::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); opacity: 1; }
+option, optgroup { background: var(--panel-2); color: var(--text); }
+code, pre, kbd { color: var(--text); }
+a[href^='tel'], a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; }
 a { color: var(--accent); }
 .muted { color: var(--muted); }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -34,7 +43,8 @@ a { color: var(--accent); }
   background: rgba(10, 15, 26, 0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
 .brand { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 8px; }
 .brand-mark { color: var(--accent); font-size: 20px; }
-.nav { display: flex; gap: 4px; flex: 1; overflow-x: auto; }
+.nav { display: flex; gap: 4px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.nav::-webkit-scrollbar { display: none; }
 .nav a { padding: 6px 12px; border-radius: 8px; color: var(--text-2); text-decoration: none; font-weight: 600; white-space: nowrap; }
 .nav a.active, .nav a:hover { background: var(--panel-2); color: var(--text); }
 .lang { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-weight: 700; }
@@ -61,7 +71,7 @@ h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: 
 .hero p { margin: 4px 0 0; color: var(--text-2); }
 .setup-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: start; }
 .vs { align-self: center; font-weight: 800; color: var(--muted); font-size: 22px; }
-.team-card { padding: 18px; display: grid; gap: 14px; }
+.team-card { padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
 .team-card .crest { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 13px; border: 2px solid; }
 .team-head { display: flex; align-items: center; gap: 12px; }
 .team-head select { flex: 1; }
@@ -198,12 +208,12 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 .calib th:first-child, .calib td:first-child { text-align: left; }
 
 @media (max-width: 1100px) {
-  .match-layout, .league-grid { grid-template-columns: 1fr; }
+  .match-layout, .league-grid { grid-template-columns: minmax(0, 1fr); }
   .side { position: static; max-height: none; }
 }
 @media (max-width: 760px) {
   main { padding: 12px 16px; }
-  .setup-grid { grid-template-columns: 1fr; }
+  .setup-grid { grid-template-columns: minmax(0, 1fr); }
   .vs { justify-self: center; }
   .report { grid-template-columns: 1fr; }
   .sb-score { font-size: 26px; }
@@ -278,7 +288,8 @@ input[type='range'] { accent-color: var(--accent); width: 100%; }
 /* ── coaches ── */
 .coach-avatar { position: relative; display: inline-grid; place-items: center; flex: none; border-radius: 50%; border: 2px solid; font-weight: 800; color: #fff; letter-spacing: .02em; }
 .coach-avatar i { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-size: 13px; line-height: 1; }
-.coach-pick { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: center; }
+.coach-pick { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; align-items: center; }
+.coach-pick select { min-width: 0; width: 100%; }
 .coach-pick label { font-size: 13px; }
 .coach-card { display: grid; gap: 10px; }
 .coach-card.compact { background: var(--panel-2); border-radius: 10px; padding: 12px; }

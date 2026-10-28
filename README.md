@@ -1,5 +1,7 @@
 # ◉ PitchMind — agent-based football simulator
 
+**▶ Играть онлайн / Play online: https://borissetkoo-hash.github.io/pitcmind-/**
+
 > 🇷🇺 **Кратко:** браузерный 2D-симулятор футбола, где счёт — не случайное число, а следствие решений 22 автономных ИИ-агентов и физики мяча. Тактика (схема, прессинг, линия обороны, ширина, вертикальность) реально меняет игру, движок откалиброван по статистике топ-лиг (голы, удары, xG, фолы, карточки). Есть live-трансляция с комментариями на русском/английском, повторы голов, режим «мысли ИИ», отчёт с картой ударов, xG и тепловыми картами, и полноценный сезон лиги с параллельной симуляцией в Web Workers.
 
 PitchMind is a 2D football (soccer) match engine and web app written in TypeScript with **zero runtime dependencies**. Twenty-two autonomous agents perceive the pitch, evaluate options and act ten times a second; a 3D ball obeys physics; the laws of the game are enforced. The score is an emergent outcome — which is why tactics matter and why the numbers can be calibrated against real football.
